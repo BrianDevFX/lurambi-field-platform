@@ -1,0 +1,6 @@
+{
+  "name": "Lurambi Campaign Field Platform",
+  "description": "Mobile-first campaign field management, voter verification, and mobilizer intelligence platform for Lurambi Constituency 2027.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
