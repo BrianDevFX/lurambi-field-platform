@@ -40,8 +40,9 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.settings (key, value, description)
 VALUES
   ('consent_policy', '{"enabled":false,"version":null}'::jsonb, 'Consent remains disabled until approved wording and version are configured.'),
-  ('verification_providers', '{"register_import_enabled":true,"manual_enabled":true,"external_link_enabled":false}'::jsonb, 'Internal verification provider availability.'),
+  ('verification_providers', '{"register_import_enabled":false,"manual_enabled":true,"external_link_enabled":false}'::jsonb, 'Only manual verification is enabled until an internal register workflow is available.'),
   ('chp_compliance_note', '{"visible":true,"exclude_default":true,"text":"CHP contacts are excluded from campaign exports by default; maintain public-service neutrality."}'::jsonb, 'Network contact export safeguards.'),
+  ('exclude_legacy_unconfirmed_from_outreach', '{"enabled":true}'::jsonb, 'Exclude legacy entries without confirmed consent from outreach exports.'),
   ('share_message_template', '{"text":"You are invited to join the campaign supporter list."}'::jsonb, 'Default referral share message.')
 ON CONFLICT (key) DO NOTHING;
 
