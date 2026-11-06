@@ -103,10 +103,10 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 | `@types/qrcode` | devDependency | KEEP | Types for QR package. |
 | `@types/react` | devDependency | KEEP | React types. |
 | `@types/react-dom` | devDependency | KEEP | React DOM types. |
-| `autoprefixer` | devDependency | NEEDS HUMAN DECISION | No direct imports found; inspect Tailwind build requirements before removal. |
-| `esbuild` | devDependency | KEEP / review | Vite transitive/build tool and explicitly allowed install script. |
+| `autoprefixer` | devDependency | REMOVE | No imports/config usage; Tailwind v4 build works without it. |
+| `esbuild` | devDependency | REMOVE | No direct usage; Vite 8/Rolldown works without a direct dependency. |
 | `tailwindcss` | devDependency | KEEP | App styling/build. |
-| `tsx` | devDependency | NEEDS HUMAN DECISION | No import found; may be an intended script runner, but no current script uses it. |
+| `tsx` | devDependency | REMOVE | No imports or scripts use it. |
 | `typescript` | devDependency | KEEP | Typecheck/lint and build. |
 
 ## Needs human decision
@@ -130,12 +130,18 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 - `src/lib/synthetic/legacyWorkbookData.ts` — removed the fake workbook generator; the workbook row type now lives in `src/types/index.ts`.
 - Import UI no longer loads a generated synthetic workbook.
 - `src/components/referral/ReferralView.tsx` no longer renders the fabricated mobilizer leaderboard.
+- `metadata.json` — unused AI Studio manifest.
+- `bun.lock` — duplicate lockfile for an unused package manager; npm's `package-lock.json` remains authoritative.
+- `vite.config.ts` — removed the AI Studio `DISABLE_HMR` branch and unused path alias; retained the Vite plugins needed by this repo.
+- `index.html` no longer downloads unused Google font families.
 
 Cleanup group verification: `npm run lint` passed. `npm run build` passed (run with elevated permission after Tailwind's native binding hit sandbox `EPERM`); Vite reports a 1.71 MB minified main JS chunk.
 
 ## Removed dependencies and size
 
-_To be updated after dependency cleanup and `npm prune`. Package size will be estimated from lockfile/install metadata where measurable._
+Removed after import searches confirmed no source/config usage: `@google/genai` (11.62 MB), `dotenv` (0.10 MB), `express` (0.21 MB), `fuse.js` (0.40 MB), `motion` (0.65 MB), `zod` (5.86 MB), `@types/express` (0.01 MB), `autoprefixer` (0.20 MB), `tsx` (0.38 MB), and direct `esbuild` (0.14 MB). Direct installed package folders totaled approximately **19.57 MB** before removal. npm reported 138 package entries removed across uninstall commands; `npm prune` completed.
+
+Verification after this group: `npm run lint` passed; `npm run build` passed. Production main JS remains about 1.71 MB minified (523 KB gzip), so charting/export libraries still dominate the bundle.
 
 ## Smoke-test checklist
 
