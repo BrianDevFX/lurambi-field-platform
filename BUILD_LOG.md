@@ -2,7 +2,7 @@
 
 ## Phase 0 — Hygiene and safety
 
-Branch: `build/phase-0`, created from `simplify` at `439f2d1`. No database was connected. The only DB-related work is static file cleanup; no SQL was executed.
+Branch: `build/phase-0`, created from `simplify` at `439f2d1`. Git history was rewritten locally after the user authorized the HUMAN STEPS; commit IDs changed. No database was connected. The only DB-related work is static file cleanup; no SQL was executed.
 
 ### Changes
 
@@ -16,21 +16,14 @@ Branch: `build/phase-0`, created from `simplify` at `439f2d1`. No database was c
 - Updated `src/lib/normalisation/normalisation.test.ts` and phone examples; removed the example supporter row from `src/lib/reports/excelExport.ts`. Updated `src/lib/duplicate/duplicateDetector.ts`, `src/lib/normalisation/importerCore.ts`, and `src/lib/normalisation/supportLevel.ts` to remove client-hash assumptions and name-like fixture examples.
 - No package upgrades were requested or performed. `npm install --save-dev vitest` added the test runner; install reported 0 vulnerabilities.
 
-### Historical purge commands — PRINTED, NOT RUN
+### Historical purge
 
-The previous commits contain the removed contact blocks and the former browser hash salt. These commands remove those entire file paths from all Git history, then restore the sanitized Phase 0 copies from the branch. Coordinate a history rewrite and remote force-push with the team before running them. They have not been executed.
+After approval, `git-filter-repo` 2.47.0 was installed in a temporary workspace folder and run locally. It removed these complete file paths from all local refs, repacked/cleaned the repository, and removed the `origin` remote automatically. The sanitized Phase 0 files were then restored from a backup outside the repository and will be recommitted in this follow-up commit. No remote push was performed. `git log --all --full-history --name-only` reports no remaining history paths for the three files.
+
+The equivalent filter command was:
 
 ```sh
-mkdir -p ../lurambi-phase0-sanitized
-git show build/phase-0:src/lib/normalisation/nationalId.ts > ../lurambi-phase0-sanitized/nationalId.ts
-git show build/phase-0:supabase/seed.sql > ../lurambi-phase0-sanitized/seed.sql
-git show build/phase-0:supabase/repair_and_seed.sql > ../lurambi-phase0-sanitized/repair_and_seed.sql
-git filter-repo --force --path src/lib/normalisation/nationalId.ts --path supabase/seed.sql --path supabase/repair_and_seed.sql --invert-paths
-cp ../lurambi-phase0-sanitized/nationalId.ts src/lib/normalisation/nationalId.ts
-cp ../lurambi-phase0-sanitized/seed.sql supabase/seed.sql
-cp ../lurambi-phase0-sanitized/repair_and_seed.sql supabase/repair_and_seed.sql
-git add src/lib/normalisation/nationalId.ts supabase/seed.sql supabase/repair_and_seed.sql
-git commit -m "Restore sanitized Phase 0 files after history scrub"
+py .phase0-tool\git_filter_repo.py --force --path src/lib/normalisation/nationalId.ts --path supabase/seed.sql --path supabase/repair_and_seed.sql --invert-paths
 ```
 
 ### Checks
@@ -43,17 +36,19 @@ git commit -m "Restore sanitized Phase 0 files after history scrub"
 | Vercel config parse | PASS — JSON parsed; one SPA rewrite and one header group. |
 | `git diff --check` | PASS — whitespace check clean; Git emitted only configured LF-to-CRLF notices. |
 
+The lint, test, and build checks were repeated after the local history rewrite and file restoration; all results remained PASS (17 tests).
+
 ### Known gaps
 
 - Authentication, Supabase client/RPC persistence, migrations, RLS, server-side ID protection, and live capture are not implemented in Phase 0. The current UI remains a prototype and must not collect real supporter data.
 - The VITE/Supabase/Turnstile variables are documented but not read by the current app; the server-only variables are not used until Vercel functions are added.
 - The Vercel headers have not been checked on a deployed preview. No local Supabase or test project was used; no TEST credentials were supplied.
 - `supabase/repair_and_seed.sql` remains temporarily; Phase 1 must fold its valid schema fixes into migrations and delete the duplicate file as specified.
-- The historical salt/contact content is still present in Git history until a human runs a coordinated filter-repo rewrite. No history rewrite was performed.
+- The rewritten local history does not include the sensitive file paths. The remote has not been force-updated; the remote may still contain the old history. `origin` was removed by the utility and has not been re-added.
 
 ## HUMAN STEPS
 
-- Before sharing/pushing this branch, decide whether to purge historical contact rows and the old browser salt. If yes, back up the sanitized files and run the printed commands above from a coordinated history-rewrite window; then force-push rewritten refs as approved by the repository owner. The commands were not run.
+- Before sharing/pushing, coordinate whether to re-add the `origin` remote and force-push rewritten refs so the remote no longer retains the old history. No remote was contacted or changed by this task.
 - No secrets or database credentials are needed for Phase 0 checks. Do not load production data. For Phase 1+, start local Supabase or provide the isolated TEST project credentials in an untracked `.env.test`; insert the HMAC/encryption secrets into the private DB schema through the SQL editor when the migration is ready.
 - After the public API functions exist, configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `TURNSTILE_SECRET_KEY` only in Vercel's server-side environment settings. Configure the public VITE values separately. None are consumed in this phase.
 - No test accounts were created; Phase 1 will need synthetic admin, coordinator, approved mobilizer, and pending mobilizer accounts.
