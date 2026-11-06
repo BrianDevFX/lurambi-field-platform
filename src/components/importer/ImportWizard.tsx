@@ -1,611 +1,261 @@
-import React, { useState } from 'react';
-import { 
-  FileSpreadsheet, 
-  Upload, 
-  CheckCircle2, 
-  AlertTriangle, 
-  ArrowRight, 
-  RefreshCw, 
-  Download, 
-  Play,
-  Users, 
-  Phone, 
-  FileText,
-  Sparkles,
-} from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { LegacyWorkbookRow } from '../../types/index.ts';
-import { 
-  processWorkbookData, 
-  generateImportReportXlsx, 
-  DryRunReport, 
-  ProcessedImportRow 
-} from '../../lib/normalisation/importerCore.ts';
+import { ChangeEvent, useMemo, useState } from 'react';
+import { supabase } from '../../lib/supabase/client.ts';
 
-export const ImportWizard: React.FC = () => {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+type ImportKind = 'entries' | 'network_contacts' | 'places' | 'skip';
+type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[]; kind: ImportKind; mapping: Record<string, string> };
+type ReportRow = { sheet: string; row: number; status: string; reason: string };
+type PlaceType = 'ward' | 'polling_centre' | 'polling_station';
+type AliasCandidate = { key: string; type: PlaceType; raw: string };
 
-  // Importer state
-  const [workbookData, setWorkbookData] = useState<Record<string, LegacyWorkbookRow[]> | null>(null);
-  const [fileName, setFileName] = useState<string>('Lurambi_2024_Legacy_Workbook_v1.xlsx');
-  const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
-  const [dryRunReport, setDryRunReport] = useState<DryRunReport | null>(null);
-  const [processedEntries, setProcessedEntries] = useState<ProcessedImportRow[]>([]);
-  
-  // Progress state for Step 4
-  const [isCommitting, setIsCommitting] = useState(false);
-  const [commitProgress, setCommitProgress] = useState(0);
-  const [commitComplete, setCommitComplete] = useState(false);
-
-  // Handle user uploaded file via SheetJS
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
-        const sheets: Record<string, LegacyWorkbookRow[]> = {};
-
-        wb.SheetNames.forEach(sheetName => {
-          const ws = wb.Sheets[sheetName];
-          const rawJson: any[] = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
-          
-          // Auto-detect header row
-          let headerIdx = 0;
-          for (let i = 0; i < Math.min(rawJson.length, 6); i++) {
-            const rowStr = JSON.stringify(rawJson[i]).toLowerCase();
-            if (rowStr.includes('name') || rowStr.includes('phone') || rowStr.includes('ward')) {
-              headerIdx = i;
-              break;
-            }
-          }
-
-          const headers: string[] = rawJson[headerIdx]?.map((h: any) => String(h).trim().toLowerCase()) || [];
-          const nameCol = headers.findIndex(h => h.includes('name'));
-          const idCol = headers.findIndex(h => h.includes('id'));
-          const phoneCol = headers.findIndex(h => h.includes('phone') || h.includes('tel') || h.includes('mobile'));
-          const wardCol = headers.findIndex(h => h.includes('ward'));
-          const placeCol = headers.findIndex(h => h.includes('centre') || h.includes('station') || h.includes('polling'));
-          const supportCol = headers.findIndex(h => h.includes('support'));
-          const dateCol = headers.findIndex(h => h.includes('date'));
-          const denomCol = headers.findIndex(h => h.includes('denom') || h.includes('church'));
-          const cuCol = headers.findIndex(h => h.includes('cu') || h.includes('community unit'));
-
-          const parsedRows: LegacyWorkbookRow[] = [];
-          for (let r = headerIdx + 1; r < rawJson.length; r++) {
-            const row = rawJson[r];
-            if (!row || !row[nameCol]) continue; // Skip blank name rows
-
-            parsedRows.push({
-              sheetName,
-              rowNumber: r + 1,
-              date: dateCol >= 0 ? String(row[dateCol]) : '2024-03-01',
-              name: String(row[nameCol] || ''),
-              idNo: idCol >= 0 ? row[idCol] : '',
-              phone: phoneCol >= 0 ? row[phoneCol] : '',
-              pollingPlace: placeCol >= 0 ? String(row[placeCol] || '') : '',
-              ward: wardCol >= 0 ? String(row[wardCol] || '') : '',
-              supportLevel: supportCol >= 0 ? String(row[supportCol] || '') : '',
-              denomination: denomCol >= 0 ? String(row[denomCol] || '') : '',
-              communityUnit: cuCol >= 0 ? String(row[cuCol] || '') : ''
-            });
-          }
-
-          sheets[sheetName] = parsedRows;
-        });
-
-        setWorkbookData(sheets);
-        setSelectedSheets(wb.SheetNames);
-        setStep(2);
-      } catch (err) {
-        console.error('Failed to parse workbook', err);
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  // Run Dry-Run Analysis (Step 2 -> Step 3)
-  const handleRunDryRun = () => {
-    if (!workbookData) return;
-    const activeSheetsData: Record<string, LegacyWorkbookRow[]> = {};
-    selectedSheets.forEach(s => {
-      if (workbookData[s]) activeSheetsData[s] = workbookData[s];
-    });
-
-    const result = processWorkbookData(activeSheetsData);
-    setDryRunReport(result.report);
-    setProcessedEntries(result.processedEntries);
-    setStep(3);
-  };
-
-  // Execute Batch Commit (Step 3 -> Step 4)
-  const handleCommitImport = () => {
-    setStep(4);
-    setIsCommitting(true);
-    setCommitProgress(0);
-
-    const total = processedEntries.length;
-    let current = 0;
-    const batchSize = Math.max(10, Math.floor(total / 10));
-
-    const interval = setInterval(() => {
-      current += batchSize;
-      if (current >= total) {
-        current = total;
-        clearInterval(interval);
-        setCommitProgress(100);
-        setIsCommitting(false);
-        setCommitComplete(true);
-      } else {
-        setCommitProgress(Math.floor((current / total) * 100));
-      }
-    }, 200);
-  };
-
-  // Download XLSX Audit Report
-  const handleDownloadReport = () => {
-    if (!processedEntries.length) return;
-    const bytes = generateImportReportXlsx(processedEntries);
-    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Lurambi_Import_Audit_Report_${Date.now()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="space-y-6">
-      <h2 className="font-semibold text-gray-900">Import and clean workbook</h2>
-
-      <>
-        <div className="space-y-6">
-          {/* Stepper Header */}
-          <div className="grid grid-cols-4 gap-2 text-xs font-bold text-center">
-            <div className={`p-2.5 rounded-lg border transition-all ${step === 1 ? 'bg-emerald-50 border-emerald-600 text-emerald-900 ring-2 ring-emerald-600/20' : step > 1 ? 'bg-emerald-100/50 border-emerald-300 text-emerald-800' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-              1. File Ingestion
-            </div>
-            <div className={`p-2.5 rounded-lg border transition-all ${step === 2 ? 'bg-emerald-50 border-emerald-600 text-emerald-900 ring-2 ring-emerald-600/20' : step > 2 ? 'bg-emerald-100/50 border-emerald-300 text-emerald-800' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-              2. Multi-Tab & Preview
-            </div>
-            <div className={`p-2.5 rounded-lg border transition-all ${step === 3 ? 'bg-emerald-50 border-emerald-600 text-emerald-900 ring-2 ring-emerald-600/20' : step > 3 ? 'bg-emerald-100/50 border-emerald-300 text-emerald-800' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-              3. Dry-Run Audit Report
-            </div>
-            <div className={`p-2.5 rounded-lg border transition-all ${step === 4 ? 'bg-emerald-50 border-emerald-600 text-emerald-900 ring-2 ring-emerald-600/20' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-              4. Batch Commit & Report
-            </div>
-          </div>
-
-          {/* STEP 1: File Ingestion */}
-          {step === 1 && (
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-xs space-y-6">
-              <div className="text-center max-w-xl mx-auto space-y-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto mb-2">
-                  <Upload className="w-6 h-6" />
-                </div>
-                <h4 className="text-lg font-bold text-gray-900">
-                  Select Legacy Supporter Workbook (.xlsx, .csv)
-                </h4>
-                <p className="text-xs text-gray-600">
-                  Upload an Excel or CSV workbook to preview and clean its records.
-                </p>
-              </div>
-
-              <div className="max-w-2xl mx-auto">
-                <label className="block p-5 rounded-xl border-2 border-dashed border-gray-300 hover:border-emerald-600 text-left cursor-pointer bg-gray-50/50 hover:bg-white">
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-200 text-gray-700">
-                        CUSTOM FILE
-                      </span>
-                      <FileSpreadsheet className="w-4 h-4 text-gray-400 group-hover:text-emerald-600" />
-                    </div>
-                    <h5 className="font-bold text-sm text-gray-900 mt-3">
-                      Upload Custom Excel File
-                    </h5>
-                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                      Drag & drop your .xlsx or .xls file here. The auto-detector will scan for headers across all tabs.
-                    </p>
-                  </div>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                  <div className="mt-4 flex items-center gap-1 text-xs font-bold text-gray-700 group-hover:text-emerald-700">
-                    <span>Browse from disk</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Multi-Tab & Preview */}
-          {step === 2 && workbookData && (
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-2">
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-                    Workbook Sheets Detected: {fileName}
-                  </h4>
-                  <p className="text-xs text-gray-500">
-                    Select which tabs to import. Tabs will be de-duplicated across each other.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900"
-                  >
-                    Change File
-                  </button>
-                  <button
-                    onClick={handleRunDryRun}
-                    className="px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors shadow-xs flex items-center gap-1.5"
-                  >
-                    Run Dry-Run Audit
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Sheet checklist */}
-              <div className="flex flex-wrap gap-2">
-                {Object.keys(workbookData).map(sheet => {
-                  const isSelected = selectedSheets.includes(sheet);
-                  const rowCount = workbookData[sheet].length;
-                  const isNetwork = sheet === 'pastors' || sheet === 'chps tv';
-                  return (
-                    <button
-                      key={sheet}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedSheets(selectedSheets.filter(s => s !== sheet));
-                        } else {
-                          setSelectedSheets([...selectedSheets, sheet]);
-                        }
-                      }}
-                      className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-all ${
-                        isSelected
-                          ? isNetwork
-                            ? 'border-teal-500 bg-teal-50 text-teal-900'
-                            : 'border-emerald-600 bg-emerald-50 text-emerald-950'
-                          : 'border-gray-200 text-gray-400 bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => {}}
-                        className="rounded text-emerald-600"
-                      />
-                      <span>{sheet}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-white border font-mono">
-                        {rowCount} rows
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Raw Preview of First 15 Rows of First Sheet */}
-              <div className="space-y-2">
-                <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider">
-                  Raw Ingestion Preview (First 10 Rows of "{selectedSheets[0] || 'Raw Data'}")
-                </h5>
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full text-xs divide-y divide-gray-200 font-sans">
-                    <thead className="bg-gray-100 text-gray-700 font-bold">
-                      <tr>
-                        <th className="py-2 px-3 text-left">Date</th>
-                        <th className="py-2 px-3 text-left">Name</th>
-                        <th className="py-2 px-3 text-left">ID No.</th>
-                        <th className="py-2 px-3 text-left">Phone</th>
-                        <th className="py-2 px-3 text-left">Polling Place</th>
-                        <th className="py-2 px-3 text-left">Ward</th>
-                        <th className="py-2 px-3 text-left">Support Level</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 text-gray-600">
-                      {(workbookData[selectedSheets[0] || 'Raw Data'] || []).slice(0, 10).map((r, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="py-2 px-3 font-mono">{r.date || '—'}</td>
-                          <td className="py-2 px-3 font-semibold text-gray-900">{r.name}</td>
-                          <td className="py-2 px-3 font-mono">
-                            {r.idNo ? String(r.idNo) : <span className="text-amber-600 italic">missing</span>}
-                          </td>
-                          <td className="py-2 px-3 font-mono">{String(r.phone)}</td>
-                          <td className="py-2 px-3">{r.pollingPlace}</td>
-                          <td className="py-2 px-3">{r.ward}</td>
-                          <td className="py-2 px-3">
-                            {r.supportLevel ? (
-                              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-[11px]">
-                                {r.supportLevel}
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Dry-Run Audit Report */}
-          {step === 3 && dryRunReport && (
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    <h4 className="font-bold text-base text-gray-900">
-                      Dry-Run Audit & Cleaning Report
-                    </h4>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Review cleaning statistics below before committing records to the campaign database.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setStep(2)}
-                    className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900"
-                  >
-                    Back to Tabs
-                  </button>
-                  <button
-                    onClick={handleCommitImport}
-                    className="px-4 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors shadow-xs flex items-center gap-1.5"
-                  >
-                    Commit {processedEntries.length} Records to Database
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Data Problem KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3.5 rounded-xl border border-gray-200 bg-gray-50 space-y-1">
-                  <span className="text-gray-500 font-semibold block">Total Rows Analyzed</span>
-                  <span className="text-xl font-bold text-gray-900">{dryRunReport.totalRowsProcessed}</span>
-                  <span className="text-[11px] text-gray-500 block">
-                    {dryRunReport.voterRows} voters • {dryRunReport.pastorRows} pastors • {dryRunReport.chpRows} CHPs
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 space-y-1">
-                  <span className="text-amber-800 font-semibold block">IDs Missing (Pending ID)</span>
-                  <span className="text-xl font-bold text-amber-900">
-                    {dryRunReport.pendingIdsCount} ({((dryRunReport.pendingIdsCount / Math.max(1, dryRunReport.voterRows)) * 100).toFixed(0)}%)
-                  </span>
-                  <span className="text-[11px] text-amber-700 block">
-                    {dryRunReport.validIdsCount} valid 7-8 digit IDs
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-1">
-                  <span className="text-emerald-800 font-semibold block">Phones Normalised to +254</span>
-                  <span className="text-xl font-bold text-emerald-900">
-                    {dryRunReport.validPhonesCount}
-                  </span>
-                  <span className="text-[11px] text-emerald-700 block">
-                    {dryRunReport.sharedPhonesCount} flagged as shared phone
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-teal-200 bg-teal-50/50 space-y-1">
-                  <span className="text-teal-800 font-semibold block">Cross-Tab Duplicates Merged</span>
-                  <span className="text-xl font-bold text-teal-900">
-                    {dryRunReport.crossTabDuplicatesMergedCount}
-                  </span>
-                  <span className="text-[11px] text-teal-700 block">
-                    Earliest captured_on retained
-                  </span>
-                </div>
-              </div>
-
-              {/* Data Cleaning Breakdown Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-2">
-                  <h5 className="font-bold text-gray-900 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-700" />
-                    Place & Ward Normalisation
-                  </h5>
-                  <div className="space-y-1.5 text-gray-600">
-                    <div className="flex justify-between py-1 border-b border-gray-100">
-                      <span>Wards Resolved via Alias / Fuzzy:</span>
-                      <strong className="text-emerald-800">{dryRunReport.resolvedWardsCount}</strong>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-gray-100">
-                      <span>Junk Polling Places Detected ("Daisy", "Approved"):</span>
-                      <strong className="text-rose-700">{dryRunReport.junkPlacesCount} (to Needs Mapping)</strong>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span>Centres Confidently Mapped:</span>
-                      <strong className="text-emerald-800">{dryRunReport.resolvedPlacesCount}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-2">
-                  <h5 className="font-bold text-gray-900 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-emerald-700" />
-                    Support Column & Network Attribution
-                  </h5>
-                  <div className="space-y-1.5 text-gray-600">
-                    <div className="flex justify-between py-1 border-b border-gray-100">
-                      <span>Misused Support Level (First names extracted):</span>
-                      <strong className="text-purple-700">{dryRunReport.misusedSupportLevelCount}</strong>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-gray-100">
-                      <span>Pastors Routed to Faith Leaders Roster:</span>
-                      <strong className="text-emerald-800">{dryRunReport.pastorRows}</strong>
-                    </div>
-                    <div className="flex justify-between py-1">
-                      <span>CHPs Isolated with Neutrality Toggle:</span>
-                      <strong className="text-teal-800">{dryRunReport.chpRows}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sample of Normalised Rows */}
-              <div className="space-y-2">
-                <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider">
-                  Sample of Normalised Records (Ready for Insertion)
-                </h5>
-                <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-72">
-                  <table className="min-w-full text-xs divide-y divide-gray-200">
-                    <thead className="bg-gray-100 text-gray-700 font-bold sticky top-0">
-                      <tr>
-                        <th className="py-2 px-3 text-left">Status</th>
-                        <th className="py-2 px-3 text-left">Name</th>
-                        <th className="py-2 px-3 text-left">Masked ID</th>
-                        <th className="py-2 px-3 text-left">Phone (+254)</th>
-                        <th className="py-2 px-3 text-left">Ward</th>
-                        <th className="py-2 px-3 text-left">Support Level</th>
-                        <th className="py-2 px-3 text-left">Flags</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 text-gray-600">
-                      {dryRunReport.sampleRows.map((r, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="py-2 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              r.status === 'imported'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : r.status === 'merged_duplicate'
-                                ? 'bg-teal-100 text-teal-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {r.status}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 font-semibold text-gray-900">{r.cleanName}</td>
-                          <td className="py-2 px-3 font-mono">{r.nationalIdMasked || 'N/A'}</td>
-                          <td className="py-2 px-3 font-mono text-emerald-700">{r.phoneE164 || 'INVALID'}</td>
-                          <td className="py-2 px-3">{r.canonicalWardName || 'Unmapped'}</td>
-                          <td className="py-2 px-3">
-                            {r.legacyMobilizerLabel ? (
-                              <span className="text-[11px] text-purple-800 bg-purple-50 px-1 rounded">
-                                {r.legacyMobilizerLabel} (mobilizer)
-                              </span>
-                            ) : (
-                              r.supportLevel
-                            )}
-                          </td>
-                          <td className="py-2 px-3">
-                            {r.flags.length > 0 ? (
-                              <span className="text-[10px] text-amber-700 font-semibold">
-                                {r.flags.join(', ')}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-emerald-600">Clean</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: Chunked Batch Progress & Completion */}
-          {step === 4 && (
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-xs space-y-6 text-center max-w-xl mx-auto">
-              {!commitComplete ? (
-                <div className="space-y-4 py-6">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto animate-spin">
-                    <RefreshCw className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-base text-gray-900">
-                      Executing Batch Inserts (Chunk Size: 1,000 / batch)...
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Attributing records to system user <code className="bg-gray-100 px-1 py-0.5 rounded font-mono">legacy_import</code>.
-                    </p>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-emerald-600 h-3 rounded-full transition-all duration-300"
-                      style={{ width: `${commitProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="text-xs font-mono text-gray-600">
-                    {commitProgress}% Completed
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-5 py-4">
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-xs">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-extrabold text-gray-900">
-                      Import Successful!
-                    </h4>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {processedEntries.length} records processed and logged into <code className="bg-gray-100 px-1 py-0.5 rounded font-mono">imports</code> table.
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 text-left space-y-1.5">
-                    <div className="flex justify-between">
-                      <span>Import Batch ID:</span>
-                      <strong className="font-mono">imp-2024-legacy-01</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Attributed Mobilizer:</span>
-                      <strong className="font-mono">legacy_import (System)</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Earliest Capture Date Preserved:</span>
-                      <strong>2024-02-10 (Kennedy Musundi)</strong>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                    <button
-                      onClick={handleDownloadReport}
-                      className="px-4 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-colors shadow-xs flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Import Report (XLSX)
-                    </button>
-                    <button
-                      onClick={() => {
-                        setStep(1);
-                        setCommitComplete(false);
-                      }}
-                      className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50"
-                    >
-                      Start Another Import
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </>
-    </div>
-  );
+const FIELD_MAP: Record<Exclude<ImportKind, 'skip'>, string[]> = {
+  entries: ['name', 'national_id', 'phone', 'ward', 'polling_centre', 'polling_station', 'support_level', 'captured_on', 'issues', 'needs_transport', 'has_pvc', 'notes'],
+  network_contacts: ['type', 'name', 'phone', 'national_id', 'ward', 'polling_station', 'denomination', 'community_unit', 'sub_county', 'reach_status', 'notes', 'exclude_from_campaign_exports'],
+  places: ['type', 'name', 'code', 'ward', 'polling_centre', 'station_number', 'registered_voters', 'total_registered_voters', 'county_name', 'constituency_name'],
 };
+const aliases: Record<string, string[]> = {
+  name: ['name', 'full name', 'supporter'], national_id: ['national id', 'id no', 'id number', 'id'],
+  phone: ['phone', 'telephone', 'mobile', 'tel'], ward: ['ward'], polling_centre: ['polling centre', 'polling center', 'centre', 'center', 'polling place'],
+  polling_station: ['polling station', 'station'], support_level: ['support level', 'support'], captured_on: ['captured on', 'date', 'capture date'],
+  denomination: ['denomination', 'church'], community_unit: ['community unit', 'cu'], type: ['type', 'contact type'],
+  polling_station_id: ['polling station id'], reach_status: ['reach status'], notes: ['notes', 'comment'],
+  exclude_from_campaign_exports: ['exclude from exports'], code: ['code'], station_number: ['station number'],
+  registered_voters: ['registered voters'], total_registered_voters: ['total registered voters'], county_name: ['county'], constituency_name: ['constituency'],
+  needs_transport: ['needs transport', 'transport'], has_pvc: ['has pvc', 'pvc'], issues: ['issues'], sub_county: ['sub county'],
+};
+
+function inferKind(sheetName: string, headers: string[]): ImportKind {
+  const title = sheetName.toLowerCase();
+  if (title.includes('pastor') || title.includes('chp') || title.includes('contact')) return 'network_contacts';
+  if (title.includes('place') || title.includes('station list') || title.includes('ward list')) return 'places';
+  if (headers.some((header) => /name|phone|ward/i.test(header))) return 'entries';
+  return 'skip';
+}
+
+function initialMapping(kind: ImportKind, headers: string[]) {
+  if (kind === 'skip') return {};
+  const result: Record<string, string> = {};
+  for (const field of FIELD_MAP[kind]) {
+    const candidates = aliases[field] || [field.replaceAll('_', ' ')];
+    const match = headers.find((header) => candidates.some((candidate) => header.toLowerCase().includes(candidate)));
+    if (match) result[field] = match;
+  }
+  return result;
+}
+
+function cellText(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value == null ? '' : String(value).trim();
+}
+
+function safeCell(value: unknown): string {
+  const text = cellText(value);
+  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
+export function ImportWizard() {
+  const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [report, setReport] = useState<ReportRow[]>([]);
+  const [dryRunReport, setDryRunReport] = useState<ReportRow[] | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'preview' | 'committed'>('idle');
+  const [placeOptions, setPlaceOptions] = useState<Record<PlaceType, { id: string; name: string }[]>>({ ward: [], polling_centre: [], polling_station: [] });
+  const [aliasTargets, setAliasTargets] = useState<Record<string, string>>({});
+  const [aliasReason, setAliasReason] = useState('');
+  const [aliasesSaved, setAliasesSaved] = useState(false);
+
+  const rowsBySheet = useMemo(() => sheets.map((sheet) => {
+    if (sheet.kind === 'skip') return [];
+    return sheet.rows.map((row) => Object.fromEntries(Object.entries(sheet.mapping)
+      .filter(([, header]) => Boolean(header)).map(([field, header]) => [field, cellText(row[header])])))
+      .filter((row) => Object.values(row).some(Boolean));
+  }), [sheets]);
+  const unmappedAliases = useMemo(() => {
+    const candidates = new Map<string, AliasCandidate>();
+    for (const item of dryRunReport || []) {
+      if (item.status !== 'unmapped') continue;
+      const sheetIndex = sheets.findIndex((sheet) => sheet.name === item.sheet);
+      if (sheetIndex < 0) continue;
+      const row = rowsBySheet[sheetIndex]?.[item.row - 2];
+      if (!row) continue;
+      for (const [field, type] of [['ward', 'ward'], ['polling_centre', 'polling_centre'], ['polling_station', 'polling_station']] as const) {
+        const raw = String(row[field] || '').trim();
+        if (raw) candidates.set(`${type}:${raw.toLowerCase()}`, { key: `${type}:${raw.toLowerCase()}`, type, raw });
+      }
+    }
+    return [...candidates.values()];
+  }, [dryRunReport, rowsBySheet, sheets]);
+
+  async function loadPlaceOptions() {
+    if (!supabase) return;
+    const [wards, centres, stations] = await Promise.all([
+      supabase.from('wards').select('id,name').order('name'),
+      supabase.from('polling_centres').select('id,name').order('name'),
+      supabase.from('polling_stations').select('id,station_name').order('station_name'),
+    ]);
+    const loadError = wards.error || centres.error || stations.error;
+    if (loadError) { setError(loadError.message); return; }
+    setPlaceOptions({ ward: wards.data || [], polling_centre: centres.data || [], polling_station: (stations.data || []).map(({ id, station_name }) => ({ id, name: station_name })) });
+  }
+
+  async function saveAliases() {
+    if (!supabase || !aliasReason.trim()) return;
+    setBusy(true); setError('');
+    for (const candidate of unmappedAliases) {
+      const targetId = aliasTargets[candidate.key];
+      if (!targetId) continue;
+      const { error: saveError } = await supabase.rpc('save_place_alias', {
+        p_type: candidate.type, p_raw_alias: candidate.raw, p_target_id: targetId, p_confidence: 1, p_reason: aliasReason.trim(),
+      });
+      if (saveError) { setError(saveError.message); setBusy(false); return; }
+    }
+    setAliasesSaved(true); setBusy(false);
+  }
+
+  async function readFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setError(''); setReport([]); setDryRunReport(null); setPhase('idle'); setAliasesSaved(false);
+    if (!file) return;
+    if (!/\.(xlsx|csv)$/i.test(file.name)) { setError('Choose an .xlsx or .csv file.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('File must be 5 MB or smaller.'); return; }
+    try {
+      const XLSX = await import('xlsx');
+      const bytes = await file.arrayBuffer();
+      const workbook = XLSX.read(bytes, { type: 'array', cellDates: true });
+      const parsed: Sheet[] = [];
+      let totalRows = 0;
+      for (const sheetName of workbook.SheetNames) {
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, defval: '' });
+        const headerIndex = matrix.slice(0, 10).findIndex((row) => row.some((cell) => /name|phone|ward|station|type/i.test(cellText(cell))));
+        if (headerIndex < 0) { parsed.push({ name: sheetName, headers: [], rows: [], kind: 'skip', mapping: {} }); continue; }
+        const headers = matrix[headerIndex].map(cellText);
+        const rows = matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => cellText(cell) !== '')).map((values) =>
+          Object.fromEntries(headers.map((header, index) => [header, values[index]])));
+        totalRows += rows.length;
+        const kind = inferKind(sheetName, headers);
+        parsed.push({ name: sheetName, headers, rows, kind, mapping: initialMapping(kind, headers) });
+      }
+      if (totalRows > 20_000) { setError('File must contain 20,000 rows or fewer.'); return; }
+      setFileName(file.name); setSheets(parsed); setPhase('preview');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not read this workbook.');
+    }
+  }
+
+  function setKind(index: number, kind: ImportKind) {
+    setSheets((current) => current.map((sheet, i) => i === index ? { ...sheet, kind, mapping: initialMapping(kind, sheet.headers) } : sheet));
+  }
+
+  function setMapping(sheetIndex: number, field: string, header: string) {
+    setSheets((current) => current.map((sheet, i) => i === sheetIndex ? { ...sheet, mapping: { ...sheet.mapping, [field]: header } } : sheet));
+  }
+
+  async function runImport(dryRun: boolean) {
+    if (!supabase || !sheets.length) return;
+    setBusy(true); setError(''); setProgress(0);
+    const newReport: ReportRow[] = [];
+    try {
+      const XLSX = await import('xlsx');
+      for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+        const sheet = sheets[sheetIndex];
+        if (sheet.kind === 'skip') continue;
+        let allRows = rowsBySheet[sheetIndex] || [];
+        if (sheet.kind === 'places') {
+          const title = sheet.name.toLowerCase();
+          const defaultType = title.includes('ward') ? 'ward' : title.includes('centre') || title.includes('center') ? 'polling_centre' : title.includes('station') ? 'polling_station' : '';
+          if (defaultType) allRows = allRows.map((row) => ({ ...row, type: row.type || defaultType }));
+          const order = { ward: 0, polling_centre: 1, polling_station: 2 } as Record<string, number>;
+          allRows = [...allRows].sort((a, b) => (order[String(a.type).toLowerCase()] ?? 3) - (order[String(b.type).toLowerCase()] ?? 3));
+        }
+        if (sheet.kind === 'network_contacts') {
+          const title = sheet.name.toLowerCase();
+          const defaultType = title.includes('pastor') ? 'pastor' : title.includes('chp') ? 'chp' : '';
+          if (defaultType) allRows = allRows.map((row) => ({ ...row, type: row.type || defaultType }));
+        }
+        if (!allRows.length) continue;
+        if (sheet.kind === 'network_contacts') {
+          const { data: stations, error: stationsError } = await supabase.from('polling_stations').select('id,station_name');
+          if (stationsError) throw new Error(`Could not load polling stations: ${stationsError.message}`);
+          const byName = new Map((stations || []).map((station) => [station.station_name.trim().toLowerCase(), station.id]));
+          allRows = allRows.map((row) => ({ ...row, polling_station_id: byName.get(String(row.polling_station || '').trim().toLowerCase()) || '' }));
+        }
+        const importId = crypto.randomUUID();
+        const rpc = sheet.kind === 'entries' ? 'import_entries_batch' : sheet.kind === 'network_contacts' ? 'import_contacts_batch' : 'import_places_batch';
+        if (dryRun) {
+          for (let offset = 0; offset < allRows.length; offset += 500) {
+            const batch = allRows.slice(offset, offset + 500);
+            const { data, error: previewError } = await supabase.rpc('preview_import_rows', { p_kind: sheet.kind, p_rows: batch });
+            if (previewError) throw new Error(`${sheet.name}: ${previewError.message}`);
+            const previewRows = (data as { rows?: { status: string; reason: string }[] }).rows || [];
+            previewRows.forEach((row, i) => newReport.push({ sheet: sheet.name, row: offset + i + 2, status: row.status, reason: row.reason }));
+            setProgress(Math.round(((sheetIndex + Math.min(offset + batch.length, allRows.length) / allRows.length) / sheets.length) * 100));
+          }
+          continue;
+        }
+        for (let offset = 0; offset < allRows.length; offset += 500) {
+          const batch = allRows.slice(offset, offset + 500);
+          const { data, error: rpcError } = await supabase.rpc(rpc, {
+            p_import_id: importId, p_file_name: fileName, p_rows: batch, p_dry_run: dryRun,
+          });
+          if (rpcError) throw new Error(`${sheet.name}: ${rpcError.message}`);
+          if (sheet.kind === 'entries' && !dryRun && /not\s*found/i.test(sheet.name)) {
+            const { error: statusError } = await supabase.rpc('set_import_verification_status', {
+              p_import_id: importId,
+              p_rows: batch.map((row) => ({ row, verification_status: 'not_found' })),
+            });
+            if (statusError) throw new Error(`${sheet.name}: ${statusError.message}`);
+          }
+          void data;
+          setProgress(Math.round(((sheetIndex + (offset + batch.length) / allRows.length) / sheets.length) * 100));
+        }
+      }
+      if (dryRun) { setReport(newReport); setDryRunReport(newReport); setPhase('preview'); setProgress(0); }
+      else { setPhase('committed'); setProgress(100); }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Import failed.');
+    } finally { setBusy(false); }
+  }
+
+  async function downloadReport() {
+    const XLSX = await import('xlsx');
+    const rows = (dryRunReport || report).map((row) => ({ Sheet: safeCell(row.sheet), Row: row.row, Status: safeCell(row.status), Reason: safeCell(row.reason) }));
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows), 'Import report');
+    XLSX.writeFile(book, `${fileName.replace(/\.[^.]+$/, '')}-import-report.xlsx`);
+  }
+
+  const counts = (dryRunReport || report).reduce<Record<string, number>>((result, row) => { result[row.status] = (result[row.status] || 0) + 1; return result; }, {});
+
+  return <section className="space-y-4">
+    <div><h2 className="text-xl font-bold text-slate-900">Import data</h2><p className="mt-1 text-sm text-slate-600">XLSX or CSV, up to 5 MB and 20,000 rows.</p></div>
+    {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+      <label className="block text-sm font-medium text-slate-700">Select workbook
+        <input type="file" accept=".xlsx,.csv" onChange={(event) => void readFile(event)} className="mt-2 block w-full text-sm" />
+      </label>
+      {sheets.map((sheet, index) => <div key={sheet.name} className="rounded-lg border border-slate-200 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2"><strong>{sheet.name}</strong><select value={sheet.kind} onChange={(event) => setKind(index, event.target.value as ImportKind)} className="rounded-md border border-slate-300 p-2 text-sm">
+          <option value="entries">Entries</option><option value="network_contacts">Network contacts</option><option value="places">Places</option><option value="skip">Skip sheet</option>
+        </select></div>
+        <p className="mt-1 text-xs text-slate-500">{sheet.rows.length} rows · header columns: {sheet.headers.join(', ') || 'none detected'}</p>
+        {sheet.kind !== 'skip' && <div className="mt-3 space-y-2"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{FIELD_MAP[sheet.kind].map((field) => <label key={field} className="text-xs text-slate-600">{field}<select value={sheet.mapping[field] || ''} onChange={(event) => setMapping(index, field, event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-1.5"><option value="">Not mapped</option>{sheet.headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></label>)}</div><div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead><tr>{FIELD_MAP[sheet.kind].map((field) => <th key={field} className="px-2 py-1">{field}</th>)}</tr></thead><tbody>{rowsBySheet[index]?.slice(0, 20).map((row, rowIndex) => <tr key={rowIndex}>{FIELD_MAP[sheet.kind as Exclude<ImportKind, 'skip'>].map((field) => <td key={field} className="max-w-40 truncate px-2 py-1">{field.includes('id') ? (row[field] ? '••••' : '') : row[field]}</td>)}</tr>)}</tbody></table></div></div>}
+      </div>)}
+      {sheets.length > 0 && <div className="flex flex-wrap gap-2">
+        <button disabled={busy} onClick={() => void runImport(true)} className="rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 disabled:opacity-50">{busy ? 'Working…' : 'Dry run'}</button>
+        <button disabled={busy || !dryRunReport} onClick={() => void runImport(false)} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Commit import</button>
+        <button disabled={busy || !dryRunReport} onClick={() => void downloadReport()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">Download report</button>
+      </div>}
+      {(busy || phase === 'committed') && <div><div className="h-2 overflow-hidden rounded bg-slate-200"><div className="h-full bg-emerald-600" style={{ width: `${progress}%` }} /></div><p className="mt-1 text-xs text-slate-600">{progress}% {phase === 'committed' ? 'complete' : 'processed'}</p></div>}
+      {dryRunReport && <div className="flex flex-wrap gap-3 text-sm">{['imported', 'merged', 'rejected', 'flagged', 'unmapped'].map((status) => <span key={status} className="rounded bg-slate-100 px-2 py-1">{status}: {counts[status] || 0}</span>)}</div>}
+      {dryRunReport && unmappedAliases.length > 0 && <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <div><h3 className="font-semibold text-slate-900">Needs mapping</h3><p className="text-xs text-slate-700">Choose the canonical place for each unmatched label, save aliases, then run the dry run again.</p></div>
+        {placeOptions.ward.length + placeOptions.polling_centre.length + placeOptions.polling_station.length === 0 ? <button onClick={() => void loadPlaceOptions()} className="rounded border border-amber-300 px-3 py-2 text-xs font-semibold">Load places</button> : null}
+        <div className="space-y-2">{unmappedAliases.map((candidate) => <label key={candidate.key} className="grid gap-1 text-xs sm:grid-cols-[1fr_2fr] sm:items-center"><span>{candidate.type.replaceAll('_', ' ')}: <strong>{candidate.raw}</strong></span><select value={aliasTargets[candidate.key] || ''} onChange={(event) => setAliasTargets((current) => ({ ...current, [candidate.key]: event.target.value }))} className="rounded border border-slate-300 bg-white p-2"><option value="">Select canonical place</option>{placeOptions[candidate.type].map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></label>)}</div>
+        <label className="block text-xs">Reason (required)<input value={aliasReason} onChange={(event) => setAliasReason(event.target.value)} className="mt-1 w-full rounded border border-slate-300 bg-white p-2" /></label>
+        <div className="flex flex-wrap gap-2"><button disabled={busy || !aliasReason.trim() || !unmappedAliases.some((candidate) => aliasTargets[candidate.key])} onClick={() => void saveAliases()} className="rounded bg-amber-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save mappings'}</button>{aliasesSaved && <button disabled={busy} onClick={() => void runImport(true)} className="rounded border border-amber-700 px-3 py-2 text-xs font-semibold">Re-run dry run</button>}</div>
+      </div>}
+    </div>
+  </section>;
+}

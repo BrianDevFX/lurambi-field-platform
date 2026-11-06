@@ -2,6 +2,8 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { AuthView } from './components/auth/AuthView.tsx';
 import { UserManagementView } from './components/admin/UserManagementView.tsx';
+import { NetworkContactsView } from './components/admin/NetworkContactsView.tsx';
+import { ImportWizard } from './components/importer/ImportWizard.tsx';
 import { MobilizerDashboard } from './components/mobilizer/MobilizerDashboard.tsx';
 import { supabase } from './lib/supabase/client.ts';
 import { Profile } from './types/index.ts';
@@ -49,6 +51,16 @@ function CompleteRegistration({ onComplete }: { onComplete: () => void }) {
       </button>
     </form>
   );
+}
+
+function AdminWorkspace({ currentProfile }: { currentProfile: Profile }) {
+  const [tab, setTab] = useState<'mobilizers' | 'import' | 'contacts'>('mobilizers');
+  return <div className="space-y-5">
+    <nav aria-label="Admin sections" className="flex gap-2 overflow-x-auto border-b border-slate-200">
+      {(['mobilizers', 'import', 'contacts'] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold capitalize ${tab === item ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-slate-600'}`}>{item === 'contacts' ? 'Network contacts' : item === 'import' ? 'Import / Places' : 'Mobilizers'}</button>)}
+    </nav>
+    {tab === 'mobilizers' ? <UserManagementView currentProfile={currentProfile} /> : tab === 'import' ? <ImportWizard /> : <NetworkContactsView />}
+  </div>;
 }
 
 function App() {
@@ -176,7 +188,7 @@ function App() {
     <div className="mx-auto max-w-7xl px-4 py-5">
       {profile.role === 'mobilizer'
         ? <MobilizerDashboard profile={profile} onSignOut={() => void signOut()} />
-        : <UserManagementView currentProfile={profile} />}
+        : profile.role === 'admin' ? <AdminWorkspace currentProfile={profile} /> : <UserManagementView currentProfile={profile} />}
     </div>
   </main>;
 }
