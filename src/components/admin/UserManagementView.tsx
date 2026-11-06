@@ -1,175 +1,123 @@
-import React, { useState } from 'react';
-import { 
-  Users, 
-  UserCheck, 
-  UserX, 
-  Shield, 
-  MapPin, 
-  Check, 
-  Clock, 
-  Search,
-  Sparkles,
-  Key
-} from 'lucide-react';
-import { CANONICAL_WARDS } from '../../data/canonicalData.ts';
-import { Profile, UserRole, UserStatus } from '../../types/index.ts';
+import { useCallback, useEffect, useState } from 'react';
+import { Profile } from '../../types/index.ts';
+import { supabase } from '../../lib/supabase/client.ts';
 
 interface UserManagementViewProps {
-  onAuditAction: (action: string, entityId: string, reason: string) => void;
+  currentProfile: Profile;
 }
 
-export const UserManagementView: React.FC<UserManagementViewProps> = ({ onAuditAction }) => {
+type UserAction = { profile: Profile; kind: 'approve' | 'suspend' } | null;
+
+export function UserManagementView({ currentProfile }: UserManagementViewProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [filterRole, setFilterRole] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [action, setAction] = useState<UserAction>(null);
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
 
-  const handleApproveMobilizer = (profileId: string) => {
-    const code = `LUR${Math.floor(100 + Math.random() * 900)}`;
-    setProfiles(prev => prev.map(p => {
-      if (p.id === profileId) {
-        return {
-          ...p,
-          status: 'approved' as UserStatus,
-          referral_code: code
-        };
+  const loadProfiles = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    setError('');
+    const { data, error: queryError } = await supabase
+      .from('profiles')
+      .select('id,email,full_name,phone_e164,role,status,home_ward_id,referral_code,created_at')
+      .order('created_at', { ascending: false });
+    if (queryError) {
+      setError(queryError.message);
+      setProfiles([]);
+    } else {
+      const rows = (data || []) as (Profile & { created_at: string })[];
+      const wardIds = [...new Set(rows.map((profile) => profile.home_ward_id).filter(Boolean))] as string[];
+      const wardNames = new Map<string, string>();
+      if (wardIds.length) {
+        const { data: wards } = await supabase.from('wards').select('id,name').in('id', wardIds);
+        for (const ward of wards || []) wardNames.set(ward.id, ward.name);
       }
-      return p;
-    }));
+      setProfiles(rows.map((profile) => ({ ...profile, home_ward_name: wardNames.get(profile.home_ward_id || '') })));
+    }
+    setLoading(false);
+  }, []);
 
-    onAuditAction('APPROVE_MOBILIZER', profileId, `Approved mobilizer and provisioned referral code ${code}`);
-  };
+  useEffect(() => { void loadProfiles(); }, [loadProfiles, refresh]);
 
-  const handleSuspendUser = (profileId: string) => {
-    setProfiles(prev => prev.map(p => {
-      if (p.id === profileId) {
-        return {
-          ...p,
-          status: 'suspended' as UserStatus
-        };
-      }
-      return p;
-    }));
+  async function saveAction() {
+    if (!supabase || !action || !reason.trim()) return;
+    setSaving(true);
+    setError('');
+    const rpcName = action.kind === 'approve' ? 'approve_mobilizer' : 'suspend_mobilizer';
+    const { error: rpcError } = await supabase.rpc(rpcName, {
+      p_profile_id: action.profile.id,
+      p_reason: reason.trim(),
+    });
+    if (rpcError) {
+      setError(rpcError.message);
+    } else {
+      setAction(null);
+      setReason('');
+      setRefresh((value) => value + 1);
+    }
+    setSaving(false);
+  }
 
-    onAuditAction('SUSPEND_USER', profileId, 'Suspended access permissions');
-  };
-
-  const filtered = profiles.filter(p => {
-    if (filterRole !== 'all' && p.role !== filterRole) return false;
-    if (filterStatus !== 'all' && p.status !== filterStatus) return false;
-    return true;
-  });
+  const canSuspend = currentProfile.role === 'admin';
 
   return (
-    <div className="space-y-5">
-      {/* Top Banner */}
-      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
-            <Users className="w-4 h-4 text-emerald-700" />
-            <span>Mobilizer Onboarding & User Administration</span>
-          </h4>
-          <p className="text-xs text-gray-500">
-            Pending mobilizers require approval before capture privileges and 6-char referral codes are activated.
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">Mobilizers</h2>
+        <p className="mt-1 text-sm text-slate-600">Review registrations in your ward. Approval enables capture and creates a referral code.</p>
+      </div>
+
+      {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+
+      {action && (
+        <form onSubmit={(event) => { event.preventDefault(); void saveAction(); }} className="rounded-xl border border-emerald-200 bg-white p-4 space-y-3">
+          <p className="text-sm text-slate-800">
+            {action.kind === 'approve' ? 'Approve' : 'Suspend'} <strong>{action.profile.full_name}</strong>?
           </p>
+          <label className="block text-sm font-medium text-slate-700">
+            Reason (required)
+            <textarea required rows={2} value={reason} onChange={(event) => setReason(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+          </label>
+          <div className="flex gap-2">
+            <button disabled={saving || !reason.trim()} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {saving ? 'Saving…' : 'Confirm'}
+            </button>
+            <button type="button" onClick={() => { setAction(null); setReason(''); }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {loading ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">Loading mobilizers…</p> : profiles.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">No mobilizers found.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+              <tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Ward</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Referral</th><th className="px-4 py-3">Action</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {profiles.filter((profile) => profile.role === 'mobilizer').map((profile) => (
+                <tr key={profile.id}>
+                  <td className="px-4 py-3 font-medium text-slate-900">{profile.full_name}</td>
+                  <td className="px-4 py-3 text-slate-700">{profile.phone_e164 || '—'}</td>
+                  <td className="px-4 py-3 text-slate-700">{profile.home_ward_name || '—'}</td>
+                  <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-xs capitalize text-slate-700">{profile.status}</span></td>
+                  <td className="px-4 py-3 font-mono text-slate-700">{profile.referral_code || '—'}</td>
+                  <td className="px-4 py-3">
+                    {profile.status === 'pending' && <button onClick={() => setAction({ profile, kind: 'approve' })} className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white">Approve</button>}
+                    {canSuspend && profile.status === 'approved' && <button onClick={() => setAction({ profile, kind: 'suspend' })} className="rounded-md border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700">Suspend</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-
-        {/* Status filters */}
-        <div className="flex gap-2 text-xs font-semibold">
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="p-1.5 border rounded-lg bg-gray-50"
-          >
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending Approval</option>
-            <option value="approved">Approved</option>
-            <option value="suspended">Suspended</option>
-          </select>
-
-          <select
-            value={filterRole}
-            onChange={e => setFilterRole(e.target.value)}
-            className="p-1.5 border rounded-lg bg-gray-50"
-          >
-            <option value="all">All Roles</option>
-            <option value="mobilizer">Mobilizers</option>
-            <option value="ward_coordinator">Ward Coordinators</option>
-            <option value="admin">Admins</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Profiles list */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-xs">
-        <table className="min-w-full text-xs divide-y divide-gray-200">
-          <thead className="bg-gray-100 text-gray-700 font-bold">
-            <tr>
-              <th className="py-3 px-4 text-left">User Name</th>
-              <th className="py-3 px-4 text-left">Phone & Email</th>
-              <th className="py-3 px-4 text-left">Role</th>
-              <th className="py-3 px-4 text-left">Ward Assignment</th>
-              <th className="py-3 px-4 text-left">Referral Code</th>
-              <th className="py-3 px-4 text-left">Status</th>
-              <th className="py-3 px-4 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 text-gray-700">
-            {filtered.map(p => (
-              <tr key={p.id} className="hover:bg-gray-50">
-                <td className="py-3 px-4 font-bold text-gray-900">{p.full_name}</td>
-                <td className="py-3 px-4 font-mono text-[11px] text-gray-600">
-                  <div>{p.phone_e164}</div>
-                  <div className="text-gray-400 font-sans text-[10px]">{p.email}</div>
-                </td>
-                <td className="py-3 px-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    p.role === 'admin'
-                      ? 'bg-purple-100 text-purple-900'
-                      : p.role === 'ward_coordinator'
-                      ? 'bg-teal-100 text-teal-900'
-                      : 'bg-emerald-100 text-emerald-900'
-                  }`}>
-                    {p.role.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="py-3 px-4">{p.home_ward_name || 'Lurambi Wide'}</td>
-                <td className="py-3 px-4 font-mono font-bold text-emerald-800">
-                  {p.referral_code || <span className="text-gray-400 font-normal italic">On approval</span>}
-                </td>
-                <td className="py-3 px-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    p.status === 'approved'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : p.status === 'pending'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-rose-100 text-rose-800'
-                  }`}>
-                    {p.status.toUpperCase()}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-center">
-                  {p.status === 'pending' && (
-                    <button
-                      onClick={() => handleApproveMobilizer(p.id)}
-                      className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs"
-                    >
-                      Approve & Issue Code
-                    </button>
-                  )}
-                  {p.status === 'approved' && p.role === 'mobilizer' && (
-                    <button
-                      onClick={() => handleSuspendUser(p.id)}
-                      className="text-rose-600 hover:text-rose-800 font-semibold text-xs"
-                    >
-                      Suspend
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      )}
+    </section>
   );
-};
+}

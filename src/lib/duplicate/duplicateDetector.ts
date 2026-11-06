@@ -4,7 +4,6 @@ import { calculateTrigramSimilarity } from '../normalisation/wardMatcher.ts';
 export interface DuplicateCheckParams {
   name: string;
   phone_e164?: string | null;
-  id_hash?: string | null;
   polling_centre_id?: string | null;
   polling_station_id?: string | null;
   ward_filed_id: string;
@@ -32,9 +31,11 @@ export interface DuplicateCheckResult {
  * Duplicate Detector Engine
  * 
  * Rules:
+ * Duplicate blocking is authoritative in the database. This helper only compares
+ * already visible, non-sensitive fields for legacy preview workflows.
+ *
  * 1. DUPLICATE (Blocking for mobilizer):
- *    - Match on a server-provided normalized ID hash, OR
- *    - When ID is missing (pending_id): Trigram name similarity >= 0.85 
+ *    - Trigram name similarity >= 0.85
  *      AND same polling centre/station AND (same phone OR same ward).
  *    - A shared phone alone is NEVER a duplicate.
  * 
@@ -48,7 +49,6 @@ export function detectDuplicate(
   const {
     name,
     phone_e164,
-    id_hash,
     polling_centre_id,
     polling_station_id,
     ward_filed_id,
@@ -58,31 +58,6 @@ export function detectDuplicate(
   const candidateEntries = excludeEntryId 
     ? existingEntries.filter(e => e.id !== excludeEntryId)
     : existingEntries;
-
-  // -------------------------------------------------------------
-  // RULE 1: Exact National ID Match (Highest priority)
-  // -------------------------------------------------------------
-  if (id_hash) {
-    const idMatch = candidateEntries.find(e => e.id_hash === id_hash);
-    if (idMatch) {
-      return {
-        isDuplicate: true,
-        isPossibleDuplicate: false,
-        matchReason: `Exact National ID match (${idMatch.id_masked || 'ID on record'})`,
-        similarityScore: 1.0,
-        matchedEntry: {
-          id: idMatch.id,
-          name: idMatch.name,
-          maskedId: idMatch.id_masked,
-          phoneE164: idMatch.phone_e164,
-          wardName: idMatch.ward_name,
-          pollingCentreName: idMatch.polling_centre_name,
-          capturedByMobilizerName: idMatch.mobilizer_name || 'System Legacy Import',
-          capturedOn: idMatch.captured_on
-        }
-      };
-    }
-  }
 
   // -------------------------------------------------------------
   // RULE 2: Fuzzy Name Similarity + Place Match (When ID is missing)

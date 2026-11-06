@@ -76,10 +76,10 @@ export interface PlaceAlias {
 
 export interface Profile {
   id: string;
-  email: string;
+  email?: string;
   full_name: string;
-  phone_e164: string;
-  national_id_masked: string;
+  phone_e164?: string;
+  national_id_masked?: string;
   role: UserRole;
   status: UserStatus;
   home_ward_id?: string;
@@ -100,7 +100,6 @@ export interface Entry {
   name: string;
   phone_e164?: string;
   id_masked?: string;
-  id_hash?: string;
   support_level: SupportLevel;
   issues: string[];
   needs_transport: boolean;
@@ -108,7 +107,7 @@ export interface Entry {
   notes?: string;
   consent_at?: string;
   consent_text_version?: string;
-  consent_status?: 'given' | 'legacy_unconfirmed' | 'revoked';
+  consent_status?: 'given' | 'legacy_unconfirmed' | 'withdrawn';
   source: EntrySource;
   verification_status: VerificationStatus;
   legacy_mobilizer_label?: string;

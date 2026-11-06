@@ -1,186 +1,111 @@
-import React, { useState } from 'react';
-import { 
-  UserPlus, 
-  ListFilter, 
-  Share2, 
-  Wifi, 
-  WifiOff, 
-  Lock, 
-  CheckCircle2, 
-  Search, 
-  MapPin, 
-  Shield 
-} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link2, List, Search, UserRound } from 'lucide-react';
 import { CaptureWizard } from '../capture/CaptureWizard.tsx';
 import { ReferralView } from '../referral/ReferralView.tsx';
-import { OfflineQueueView } from '../offline/OfflineQueueView.tsx';
-import { Entry } from '../../types/index.ts';
+import { supabase } from '../../lib/supabase/client.ts';
+import { Entry, Profile } from '../../types/index.ts';
+
+type Tab = 'capture' | 'list' | 'link' | 'profile';
+type RawEntry = Omit<Entry, 'ward_name' | 'polling_centre_name' | 'polling_station_name'>;
 
 interface MobilizerDashboardProps {
-  entries: Entry[];
-  onAddEntry: (newEntry: Entry) => void;
-  isSimulatedOffline: boolean;
-  onToggleSimulatedOffline: () => void;
+  profile: Profile;
+  onSignOut: () => void;
 }
 
-export const MobilizerDashboard: React.FC<MobilizerDashboardProps> = ({
-  entries,
-  onAddEntry,
-  isSimulatedOffline,
-  onToggleSimulatedOffline
-}) => {
-  const [mobileTab, setMobileTab] = useState<'capture' | 'my_list' | 'referrals' | 'offline_queue'>('capture');
+export function MobilizerDashboard({ profile, onSignOut }: MobilizerDashboardProps) {
+  const [tab, setTab] = useState<Tab>('capture');
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
 
-  // Filter mobilizer's own entries (Mobilizers only view their own records under RLS)
-  const myEntries = entries.filter(e => e.source === 'mobilizer' || e.source === 'self_registered');
+  const loadEntries = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    setError('');
+    const [entryResult, wardResult, centreResult, stationResult] = await Promise.all([
+      supabase.from('entries')
+        .select('id,mobilizer_id,ward_filed_id,polling_centre_id,polling_station_id,name,phone_e164,id_masked,support_level,issues,needs_transport,has_pvc,notes,consent_at,consent_text_version,consent_status,source,verification_status,captured_on,flags')
+        .order('captured_on', { ascending: false }).range(0, 49),
+      supabase.from('wards').select('id,name'),
+      supabase.from('polling_centres').select('id,name'),
+      supabase.from('polling_stations').select('id,station_name'),
+    ]);
+    if (entryResult.error || wardResult.error || centreResult.error || stationResult.error) {
+      setError((entryResult.error || wardResult.error || centreResult.error || stationResult.error)!.message);
+      setEntries([]);
+    } else {
+      const wards = new Map((wardResult.data || []).map((row) => [row.id, row.name]));
+      const centres = new Map((centreResult.data || []).map((row) => [row.id, row.name]));
+      const stations = new Map((stationResult.data || []).map((row) => [row.id, row.station_name]));
+      setEntries(((entryResult.data || []) as RawEntry[]).map((entry) => ({
+        ...entry,
+        ward_name: wards.get(entry.ward_filed_id) || '',
+        polling_centre_name: entry.polling_centre_id ? centres.get(entry.polling_centre_id) : undefined,
+        polling_station_name: entry.polling_station_id ? stations.get(entry.polling_station_id) : undefined,
+        mobilizer_name: profile.full_name,
+      })));
+    }
+    setLoading(false);
+  }, [profile.full_name]);
 
-  return (
-    <div className="space-y-6">
-      {/* Mobilizer Navigation Sub-tabs */}
-      <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-xs flex items-center justify-between sm:justify-start gap-1 overflow-x-auto text-xs font-bold">
-        <button
-          onClick={() => setMobileTab('capture')}
-          className={`py-2 px-3 rounded-lg flex items-center gap-1.5 transition-all ${
-            mobileTab === 'capture'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Capture Voter</span>
-        </button>
+  useEffect(() => {
+    if (tab === 'list') void loadEntries();
+  }, [tab, refresh, loadEntries]);
 
-        <button
-          onClick={() => setMobileTab('my_list')}
-          className={`py-2 px-3 rounded-lg flex items-center gap-1.5 transition-all ${
-            mobileTab === 'my_list'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <ListFilter className="w-4 h-4" />
-          <span>My List ({myEntries.length})</span>
-        </button>
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'capture', label: 'Search / Add' },
+    { id: 'list', label: 'My List' },
+    { id: 'link', label: 'My Link' },
+    { id: 'profile', label: 'Profile' },
+  ];
 
-        <button
-          onClick={() => setMobileTab('referrals')}
-          className={`py-2 px-3 rounded-lg flex items-center gap-1.5 transition-all ${
-            mobileTab === 'referrals'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <Share2 className="w-4 h-4" />
-          <span>Referral QR & Link</span>
-        </button>
+  return <div className="pb-24">
+    {tab === 'capture' && <CaptureWizard profile={profile} onEntryAdded={() => setRefresh((value) => value + 1)} />}
 
-        <button
-          onClick={() => setMobileTab('offline_queue')}
-          className={`py-2 px-3 rounded-lg flex items-center gap-1.5 transition-all ${
-            mobileTab === 'offline_queue'
-              ? 'bg-emerald-700 text-white shadow-xs'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          {isSimulatedOffline ? <WifiOff className="w-4 h-4 text-amber-500" /> : <Wifi className="w-4 h-4" />}
-          <span>PWA Offline Queue</span>
-        </button>
-      </div>
-
-      {/* Main View Area */}
-      {mobileTab === 'capture' && (
-        <CaptureWizard
-          existingEntries={entries}
-          onEntryAdded={onAddEntry}
-          isSimulatedOffline={isSimulatedOffline}
-        />
-      )}
-
-      {mobileTab === 'my_list' && (
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <div>
-              <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
-                <ListFilter className="w-4 h-4 text-emerald-700" />
-                <span>My Captured Supporters ({myEntries.length})</span>
-              </h4>
-              <p className="text-xs text-gray-500">
-                PostgreSQL RLS Policy: Mobilizers can view only their own records.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
-              <Lock className="w-3.5 h-3.5" />
-              <span>Immutable (No Edit / Delete)</span>
-            </div>
-          </div>
-
-          {myEntries.length > 0 ? (
-            <div className="space-y-2">
-              {myEntries.map(entry => (
-                <div
-                  key={entry.id}
-                  className="p-3.5 rounded-xl border border-gray-200 bg-gray-50/50 hover:bg-white transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-gray-900">{entry.name}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        entry.verification_status === 'verified'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : entry.verification_status === 'pending_id'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-gray-200 text-gray-700'
-                      }`}>
-                        {entry.verification_status}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                      <span>ID: <code className="font-mono text-gray-700">{entry.id_masked || 'Pending ID'}</code></span>
-                      <span>Phone: <code className="font-mono text-gray-700">{entry.phone_e164 || 'None'}</code></span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-emerald-600" />
-                        {entry.ward_name} ({entry.polling_centre_name || 'Centre'})
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 capitalize">
-                      {entry.support_level.replace('_', ' ')}
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-mono">
-                      {entry.captured_on}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-gray-500">
-              You haven't captured any supporters yet. Use the "Capture Voter" tab to register your first voter!
-            </div>
-          )}
+    {tab === 'list' && <section className="space-y-3">
+      <div className="flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">My entries</h2><button onClick={() => void loadEntries()} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Refresh</button></div>
+      {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+      {loading ? <p className="rounded-xl bg-white p-5 text-sm text-slate-600">Loading entries…</p> : entries.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No entries yet.</p>
+      ) : entries.map((entry) => <article key={entry.id} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div><h3 className="font-semibold text-slate-900">{entry.name}</h3><p className="mt-1 text-xs text-slate-600">{entry.ward_name} · {entry.polling_centre_name || 'No centre'}{entry.polling_station_name ? ` · ${entry.polling_station_name}` : ''}</p></div>
+          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs capitalize text-slate-700">{entry.verification_status.replaceAll('_', ' ')}</span>
         </div>
-      )}
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+          <span>ID: {entry.id_masked || 'Pending ID'}</span><span>Phone: {entry.phone_e164 || 'No phone'}</span>
+          <span>Support: {entry.support_level.replaceAll('_', ' ')}</span><span>{new Date(entry.captured_on).toLocaleString()}</span>
+        </div>
+        {entry.flags.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{entry.flags.map((flag) => <span key={flag} className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900">{flag.replaceAll('_', ' ')}</span>)}</div>}
+        <p className="mt-3 text-xs text-slate-500">Submitted entries cannot be edited or deleted.</p>
+      </article>)}
+    </section>}
 
-      {mobileTab === 'referrals' && (
-        <ReferralView
-          entries={entries}
-          onSelfRegisterEntry={onAddEntry}
-        />
-      )}
+    {tab === 'link' && <ReferralView referralCode={profile.referral_code} mobilizerName={profile.full_name} />}
 
-      {mobileTab === 'offline_queue' && (
-        <OfflineQueueView
-          isSimulatedOffline={isSimulatedOffline}
-          onToggleSimulatedOffline={onToggleSimulatedOffline}
-          onEntriesSynced={syncedList => {
-            syncedList.forEach(item => onAddEntry(item));
-          }}
-        />
-      )}
-    </div>
-  );
-};
+    {tab === 'profile' && <section className="mx-auto max-w-xl rounded-xl border border-slate-200 bg-white p-5">
+      <h2 className="text-lg font-bold text-slate-900">Profile</h2>
+      <dl className="mt-4 divide-y divide-slate-100 text-sm">
+        <div className="flex justify-between gap-3 py-3"><dt className="text-slate-500">Name</dt><dd className="text-right font-medium text-slate-900">{profile.full_name}</dd></div>
+        <div className="flex justify-between gap-3 py-3"><dt className="text-slate-500">Phone</dt><dd className="text-right font-medium text-slate-900">{profile.phone_e164 || '—'}</dd></div>
+        <div className="flex justify-between gap-3 py-3"><dt className="text-slate-500">Home ward</dt><dd className="text-right font-medium text-slate-900">{profile.home_ward_name || '—'}</dd></div>
+        <div className="flex justify-between gap-3 py-3"><dt className="text-slate-500">National ID</dt><dd className="text-right font-mono text-slate-900">{profile.national_id_masked || '—'}</dd></div>
+        <div className="flex justify-between gap-3 py-3"><dt className="text-slate-500">Referral code</dt><dd className="text-right font-mono font-semibold text-slate-900">{profile.referral_code || '—'}</dd></div>
+      </dl>
+      <button onClick={onSignOut} className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Sign out</button>
+    </section>}
+
+    <nav aria-label="Mobilizer navigation" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-slate-200 bg-white px-1 pb-2 pt-1 shadow-[0_-4px_14px_rgba(15,23,42,0.08)]">
+      {tabs.map((item) => {
+        const Icon = item.id === 'capture' ? Search : item.id === 'list' ? List : item.id === 'link' ? Link2 : UserRound;
+        return <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}
+          className={`flex min-w-0 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[11px] font-semibold ${tab === item.id ? 'text-emerald-800' : 'text-slate-600'}`}>
+          <Icon className="h-5 w-5" aria-hidden="true" />
+          <span className="truncate">{item.label}{item.id === 'list' ? ` (${entries.length})` : ''}</span>
+        </button>;
+      })}
+    </nav>
+  </div>;
+}
