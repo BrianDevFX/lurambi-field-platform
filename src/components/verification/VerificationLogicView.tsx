@@ -55,7 +55,6 @@ export const VerificationLogicView: React.FC = () => {
       entryId: entry.id,
       name: entry.name,
       nationalIdHash: entry.id_hash,
-      rawNationalId: entry.id_masked ? entry.id_masked.replace(/\*/g, '4') : undefined,
       wardId: entry.ward_filed_id,
       wardName: entry.ward_name,
       pollingCentreId: entry.polling_centre_id,

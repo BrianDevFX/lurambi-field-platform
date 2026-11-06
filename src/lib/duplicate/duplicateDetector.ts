@@ -33,7 +33,7 @@ export interface DuplicateCheckResult {
  * 
  * Rules:
  * 1. DUPLICATE (Blocking for mobilizer):
- *    - Match on normalised National ID (via salted id_hash), OR
+ *    - Match on a server-provided normalized ID hash, OR
  *    - When ID is missing (pending_id): Trigram name similarity >= 0.85 
  *      AND same polling centre/station AND (same phone OR same ward).
  *    - A shared phone alone is NEVER a duplicate.

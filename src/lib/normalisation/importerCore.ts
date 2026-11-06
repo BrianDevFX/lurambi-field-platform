@@ -64,7 +64,7 @@ export function processWorkbookData(
   const chps: NetworkContact[] = [];
 
   // Trackers for duplicates across tabs:
-  // Keyed by idHash (if present) or normalised name + ward
+  // Temporary preview dedupe only; authoritative ID matching belongs in the DB RPC.
   const seenVoters = new Map<string, ProcessedImportRow>();
   const phoneCounts = new Map<string, number>();
 
@@ -203,10 +203,8 @@ export function processWorkbookData(
       }
 
       // G. Determine deduplication key
-      // If valid ID hash present, match on ID hash; otherwise name + ward
-      const dedupeKey = idRes.idHash 
-        ? `id:${idRes.idHash}` 
-        : `name:${row.name.toLowerCase().trim()}:${wardRes.canonicalWardName || 'unknown'}`;
+      // This browser-side preview does not hash or retain national IDs.
+      const dedupeKey = `name:${row.name.toLowerCase().trim()}:${wardRes.canonicalWardName || 'unknown'}`;
 
       const rawCapturedOn = row.date ? String(row.date) : '2024-03-01';
 
@@ -228,7 +226,7 @@ export function processWorkbookData(
           cleanName: row.name.trim(),
           rawId: row.idNo,
           nationalIdMasked: idRes.maskedId,
-          nationalIdHash: idRes.idHash,
+          nationalIdHash: null,
           rawPhone: row.phone,
           phoneE164: phoneRes.phone_e164,
           rawWard: row.ward,
@@ -254,7 +252,7 @@ export function processWorkbookData(
           cleanName: row.name.trim(),
           rawId: row.idNo,
           nationalIdMasked: idRes.maskedId,
-          nationalIdHash: idRes.idHash,
+          nationalIdHash: null,
           rawPhone: row.phone,
           phoneE164: phoneRes.phone_e164,
           rawWard: row.ward,

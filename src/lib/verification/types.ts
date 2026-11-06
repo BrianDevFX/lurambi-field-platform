@@ -4,7 +4,6 @@ export interface VerificationRequest {
   entryId: string;
   name: string;
   nationalIdHash?: string | null;
-  rawNationalId?: string | null;
   wardId: string;
   wardName?: string;
   pollingCentreId?: string | null;

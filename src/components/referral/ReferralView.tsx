@@ -96,7 +96,6 @@ export const ReferralView: React.FC<ReferralViewProps> = ({
         name: joinName.trim(),
         phone_e164: joinPhone.startsWith('+') ? joinPhone : `+254${joinPhone.replace(/^0/, '')}`,
         id_masked: joinId ? `${joinId.slice(0, 2)}***${joinId.slice(-3)}` : undefined,
-        id_hash: joinId ? `${joinId}_hash` : undefined,
         ward_filed_id: 'a0000001-0000-0000-0000-000000000001',
         ward_name: joinWard,
         support_level: 'strong_supporter',

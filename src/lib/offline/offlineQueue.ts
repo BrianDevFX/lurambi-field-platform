@@ -11,9 +11,8 @@ export interface OfflineQueuedEntry {
   capturedOn: string;
   name: string;
   phone_e164: string | null;
-  national_id_raw?: string | null;
   national_id_masked: string | null;
-  national_id_hash: string | null;
+  national_id_status: 'valid' | 'missing' | 'invalid';
   ward_filed_id: string;
   ward_name: string;
   polling_centre_id: string | null;

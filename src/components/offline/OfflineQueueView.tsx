@@ -67,7 +67,6 @@ export const OfflineQueueView: React.FC<OfflineQueueViewProps> = ({
         name: item.name,
         phone_e164: item.phone_e164 || undefined,
         id_masked: item.national_id_masked || undefined,
-        id_hash: item.national_id_hash || undefined,
         ward_filed_id: item.ward_filed_id,
         ward_name: item.ward_name,
         polling_centre_id: item.polling_centre_id || undefined,
@@ -83,10 +82,10 @@ export const OfflineQueueView: React.FC<OfflineQueueViewProps> = ({
         consent_text_version: item.consent_text_version,
         consent_status: 'given',
         source: 'mobilizer',
-        verification_status: item.national_id_hash ? 'unverified' : 'pending_id',
+        verification_status: item.national_id_status === 'missing' ? 'pending_id' : 'unverified',
         captured_on: item.capturedOn,
         mobilizer_name: item.mobilizer_name,
-        flags: item.national_id_hash ? [] : ['MISSING_ID']
+        flags: item.national_id_status === 'missing' ? ['MISSING_ID'] : item.national_id_status === 'invalid' ? ['INVALID_ID'] : []
       });
 
       await removeQueuedEntry(item.queueId);

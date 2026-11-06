@@ -65,16 +65,13 @@ export class ManualVerificationProvider implements VerificationProvider {
    * Bulk processes an uploaded verifier results sheet (e.g. CSV/XLSX with ID, status, note)
    */
   processBulkResultsSheet(
-    rows: Array<{ nationalId: string; status: VerificationStatus; notes: string }>,
-    entriesList: Array<{ id: string; rawId?: string | number; idHash?: string }>,
+    rows: Array<{ nationalIdHash: string; status: VerificationStatus; notes: string }>,
+    entriesList: Array<{ id: string; idHash?: string }>,
     verifiedByUserName: string
   ): number {
     let count = 0;
     for (const row of rows) {
-      const match = entriesList.find(e => 
-        String(e.rawId) === String(row.nationalId) || 
-        (e.idHash && e.idHash.startsWith(String(row.nationalId)))
-      );
+      const match = entriesList.find(e => e.idHash === row.nationalIdHash);
 
       if (match) {
         this.recordManualVerification({

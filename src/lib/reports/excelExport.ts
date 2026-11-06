@@ -36,10 +36,7 @@ export function downloadCleanImportTemplate(): void {
     ['Date (YYYY-MM-DD)', 'NAME', 'ID NO.', 'PHONE', 'WARD', 'POLLING CENTRE', 'POLLING STATION', 'SUPPORT LEVEL', 'EVENT CONTACT', 'AGE']
   ];
 
-  const sampleRows = [
-    ['2026-10-22', 'Barasa Wekesa Example', '28491023', '0712345678', 'Sheywe', 'Kakamega Primary School', 'Kakamega Primary - Stream 1', 'Strong Supporter', '', '32'],
-    ['2026-10-22', 'Nafuna Makokha Example', '', '0705961838', 'Shirere', 'Amalemba Primary School', 'Amalemba Primary - Stream 1', 'Leaning', '', '28']
-  ];
+  const sampleRows: string[][] = [];
 
   const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleRows]);
   XLSX.utils.book_append_sheet(wb, ws, 'Template');

@@ -50,7 +50,7 @@ export function normaliseSupportLevel(input: string | null | undefined): Support
   }
 
   // 2. Misused column detected!
-  // In the Lurambi legacy workbook, names like "Zainab", "Mildred", "Erick" were entered into the SUPPORT LEVEL column.
+  // Legacy imports sometimes put a mobilizer label in the SUPPORT LEVEL column.
   // Re-route this text to legacy_mobilizer_label for admin verification and set support_level to not_assessed.
   return {
     raw: input,

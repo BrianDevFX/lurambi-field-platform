@@ -149,7 +149,6 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
       {
         name,
         phone_e164: phoneRes.phone_e164,
-        id_hash: idRes.idHash,
         polling_centre_id: selectedCentreId,
         polling_station_id: selectedStationId,
         ward_filed_id: selectedWardId
@@ -173,7 +172,6 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
       name: name.trim(),
       phone_e164: phoneRes.phone_e164 || undefined,
       id_masked: idRes.maskedId || undefined,
-      id_hash: idRes.idHash || undefined,
       ward_filed_id: selectedWardId,
       ward_name: ward.name,
       polling_centre_id: selectedCentreId || undefined,
@@ -201,9 +199,8 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
         capturedOn: newEntry.captured_on,
         name: newEntry.name,
         phone_e164: newEntry.phone_e164 || null,
-        national_id_raw: idRaw || null,
         national_id_masked: newEntry.id_masked || null,
-        national_id_hash: newEntry.id_hash || null,
+        national_id_status: idRes.status,
         ward_filed_id: newEntry.ward_filed_id,
         ward_name: newEntry.ward_name,
         polling_centre_id: newEntry.polling_centre_id || null,
@@ -403,7 +400,7 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g. Barasa Wekesa"
+                placeholder="Synthetic supporter name"
                 className="w-full p-2.5 border rounded-xl bg-gray-50 focus:bg-white focus:border-emerald-600 outline-hidden"
               />
             </div>
@@ -418,7 +415,7 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
                 type="text"
                 value={idRaw}
                 onChange={e => setIdRaw(e.target.value)}
-                placeholder="7 or 8 digits (e.g. 28491023)"
+                placeholder="7 or 8 digits"
                 className="w-full p-2.5 border rounded-xl bg-gray-50 focus:bg-white focus:border-emerald-600 outline-hidden font-mono"
               />
               {!idRaw && (
@@ -436,7 +433,7 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
                 type="text"
                 value={phoneRaw}
                 onChange={e => setPhoneRaw(e.target.value)}
-                placeholder="e.g. 0712345678 or 712345678"
+                placeholder="0711111111 or 711111111"
                 className="w-full p-2.5 border rounded-xl bg-gray-50 focus:bg-white focus:border-emerald-600 outline-hidden font-mono"
               />
               {phoneRaw && (

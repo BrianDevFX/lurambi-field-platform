@@ -2,9 +2,9 @@
  * Phone Number Normalisation Utility for Kenyan Mobile Numbers
  * 
  * Rules:
- * - 9 digits starting with 7 or 1 -> prefix '+254' (e.g. 712345678 -> +254712345678)
- * - 10 digits starting with 07 or 01 -> strip leading 0, prefix '+254' (e.g. 0712345678 -> +254712345678)
- * - 12 digits starting with 254 -> prefix '+' (e.g. 254712345678 -> +254712345678)
+ * - 9 digits starting with 7 or 1 -> prefix '+254' (e.g. 7XXXXXXXX -> +2547XXXXXXXX)
+ * - 10 digits starting with 07 or 01 -> strip leading 0, prefix '+254' (e.g. 07XXXXXXXX -> +2547XXXXXXXX)
+ * - 12 digits starting with 254 -> prefix '+' (e.g. 2547XXXXXXXX -> +2547XXXXXXXX)
  * - 13 characters starting with +254 -> keep
  * - Formatting characters (spaces, dashes, parens) stripped
  * - Anything else -> flag as INVALID_PHONE
@@ -54,7 +54,7 @@ export function normaliseKenyanPhone(input: string | number | null | undefined):
     };
   }
 
-  // Case 2: 10 digits starting with 07 or 01 (standard local format e.g. 0712345678)
+  // Case 2: 10 digits starting with 07 or 01 (standard local format e.g. 07XXXXXXXX)
   if (cleaned.length === 10 && (cleaned.startsWith('07') || cleaned.startsWith('01'))) {
     return {
       raw: input,

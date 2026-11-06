@@ -31,7 +31,7 @@ export class RegisterImportProvider implements VerificationProvider {
     const now = new Date().toISOString();
 
     // 1. If National ID is missing, voter status is pending_id
-    if (!request.nationalIdHash && !request.rawNationalId) {
+    if (!request.nationalIdHash) {
       return {
         entryId: request.entryId,
         status: 'pending_id',
@@ -42,11 +42,11 @@ export class RegisterImportProvider implements VerificationProvider {
       };
     }
 
-    const searchHash = request.nationalIdHash || (request.rawNationalId ? `${request.rawNationalId}_hash` : '');
+    const searchHash = request.nationalIdHash;
 
     // 2. Search register by National ID Hash
     const matchedRecord = this.records.find(
-      r => r.nationalIdHash === searchHash || (request.rawNationalId && r.nationalIdHash.startsWith(String(request.rawNationalId)))
+      r => r.nationalIdHash === searchHash
     );
 
     if (matchedRecord) {
