@@ -165,3 +165,42 @@ Branch: `build/phase-3`, based on `build/phase-2`. Phase commits: `859b734` (dat
 - Apply migrations through `20261106150000_phase3_import_operations.sql` and seed only a local Supabase instance or the dedicated TEST project. Insert the two private DB secrets as described in README; do not put them in env files.
 - Use synthetic admin/coordinator/mobilizer accounts. Import a synthetic workbook with entries, duplicate rows, “not found”, contacts, and ward/centre/station sheets. Verify dry-run versus commit results, a second identical import, alias save/re-preview, CHP exclusion, contact update audit events, and replacement of synthetic places.
 - Run the RLS suite and confirm the full synthetic import workflow before loading real records. No push, merge, or production DB access has occurred.
+
+## Phase 4 — Admin operations and exports
+
+Branch: `build/phase-4`, created from `build/phase-3`. Phase commits: `f3a4bfc` (audited database operations), `c0aeda9` (admin tools and scoped exports), and `50ef777` (settings and export wiring). Nothing was pushed or merged. No local Supabase or dedicated TEST database was available; no database was contacted.
+
+### Changes
+
+- Added admin entry editing through `admin_update_entry` with a required reason, mobilizer/ward reassignment through `admin_reassign_entry`, and flag resolve/dismiss/merge controls through `resolve_flag`. The UI uses safe entry selects with masked IDs; table updates/deletes remain RPC-only.
+- Added a verification queue grouped by ward and centre, manual per-selection bulk status updates with evidence notes, a 500-row XLSX/CSV ID + status upload, and a downloadable masked “to verify” sheet. Bulk National IDs are sent only to the admin-only RPC, which hashes them inside Postgres and returns counts without returning IDs.
+- Added an append-only audit viewer with action filtering and logged CSV export. Added audited settings updates for consent text/version, share-message template, issue categories, CHP note, manual verification enablement, and excluding unconfirmed legacy consent from outreach exports. Manual verification enablement is checked in both the UI and `set_verification`; automated register and external providers remain disabled.
+- Added audited CRUD for wards, centres, stations and aliases. Deletes are blocked when records depend on the place; admins must reassign dependencies first. The prior import wizard remains the “Needs mapping” queue.
+- Added a role-scoped export center for supporter records, flags, verification, ward/station summaries, mobilizer performance and eligible network contacts. Mobilizers can export their own entries from My List; coordinators see their ward through RLS. XLSX/CSV/PDF creation logs through `log_export`; exported cell text is neutralized against formula injection. Added logged import templates and import-report downloads.
+- Updated the seed default so only manual verification is enabled until a database register workflow exists. No new dependencies were added.
+
+### Checks
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
+| `npm test` | PASS — 20 passed; 10 RLS tests skipped without TEST credentials/runtime. |
+| `npm run build` | PASS — Vite production build completed. Main JS 566.86 KB minified / 156.89 KB gzip; XLSX 491.99 KB / 160.33 KB gzip; jsPDF 399.67 KB / 129.90 KB gzip. Vite warns that the main and XLSX chunks exceed 500 KB minified. |
+| `git diff --check` | PASS — no whitespace errors. Git only warned about its configured LF-to-CRLF conversion. |
+| Migration replay, RLS, admin workflows, CSV formula test in Excel | NOT VERIFIED — no isolated database/browser test project was available. |
+
+### Known gaps
+
+- New migration SQL has not been replayed or exercised. Role checks and referential delete protections were reviewed statically only.
+- Admin entry and flag queues show up to 500 rows; verification shows up to 1,000; the audit viewer shows up to 500. Export queries page through permitted entries but currently load all matching rows in browser memory.
+- Automated register verification is not wired to the database; its setting is forcibly disabled. The external link provider remains disabled with no outbound request path.
+- PDF/Excel exports and formula-injection neutralization were not opened in Excel or tested at runtime. Only masked IDs are selected for exports.
+- The existing ten RLS integration tests still skip without a dedicated TEST database. No live role, audit, settings, merge, or export-log behavior has been confirmed.
+- `PROGRESS_AUDIT.md` and `audit/` remain pre-existing untracked artifacts and were not modified or staged.
+
+## HUMAN STEPS
+
+- Apply `supabase/migrations/20261106160000_phase4_admin_operations.sql` and reseed only on local Supabase or the isolated TEST project. Verify the migration from an empty database and confirm the settings provider values show manual enabled, register import disabled, and external disabled.
+- With synthetic accounts, verify admin edit/reassign/merge/delete protections and audit entries; coordinator read-only ward scoping; manual verification on/off; bulk ID upload results; alias/place CRUD; and export row counts under each role.
+- Export synthetic cells beginning with `=`, `+`, `-`, `@`, tab and carriage return to XLSX, CSV and PDF, and confirm no formula executes in spreadsheet software. Confirm each export appears in `exports_log` and mobilizer/coordinator data stays within RLS scope.
+- Run the RLS integration suite and deployed-preview smoke checks before using real records. No push, merge, or production database access has occurred.
