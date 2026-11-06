@@ -243,3 +243,39 @@ Branch: `build/phase-5`, created from `build/phase-4`. No push, merge, or produc
 - With synthetic accounts and data, test `/join/<referral_code>` on a phone viewport: valid attribution, optional ID, required consent, invalid/duplicate referral behavior, duplicate privacy, Turnstile rejection, honeypot handling, and rate limits. Check resulting entry flags and masked IDs in the admin UI.
 - Submit access, correction, and deletion requests with synthetic details; verify rate limiting and admin status/reason updates appear in `audit_log`. Confirm legacy consent only after direct supporter confirmation and verify its audit event.
 - Run the skipped RLS tests and review the deployed preview headers before loading any real records. No push, merge, or production DB access has occurred.
+
+## Phase 6 — Dashboard from real data
+
+Branch: `build/phase-6`, created from `build/phase-5`. No push, merge, or database connection occurred.
+
+### Changes
+
+- Added `public.dashboard_metrics(JSONB)` in `supabase/migrations/20261107110000_phase6_dashboard_analytics.sql`. It requires an approved authenticated role, filters by ward/centre/station/mobilizer/date/support/verification/source, scopes coordinators to their own ward and mobilizers to their own entries, and returns aggregate metrics without supporter PII. Mobilizers do not receive register-size or network-contact totals.
+- Added dashboard panels for ward and station totals/coverage, support breakdown and ward × support, verification funnel, priority stations, mobilizer quality and duplicate attempts, ID/phone/place/support completeness, top issues, capture timeline, and ward-level network-contact counts. Each panel has an Excel export logged through `log_export`; spreadsheet formula-leading text is neutralized.
+- Added the Dashboard section for admins and coordinators. Coordinators see only their own ward. Mobilizers see a compact personal activity/support summary inside the existing Profile tab.
+- Files changed: `supabase/migrations/20261107110000_phase6_dashboard_analytics.sql`, `src/components/dashboard/DashboardView.tsx`, `src/components/admin/AdminOperationsView.tsx`, `src/components/mobilizer/MobilizerDashboard.tsx`, `src/App.tsx`, `BUILD_LOG.md`.
+
+### Checks
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
+| `npm test` | PASS — 20 passed; 10 database-backed RLS tests skipped without isolated Supabase credentials/runtime. |
+| `npm run build` | PASS — Vite production build completed. Main JS 598.54 KB minified / 162.58 KB gzip; XLSX 491.99 KB / 160.33 KB gzip; jsPDF 399.67 KB / 129.90 KB gzip. Vite warns that the main and XLSX chunks exceed 500 KB minified. |
+| `git diff --check` | PASS — no whitespace errors; Git only reports configured LF-to-CRLF conversion warnings. |
+| SQL migration replay, RLS dashboard scope, synthetic count reconciliation, Excel exports, throttled mobile load | NOT VERIFIED — no local Supabase CLI/runtime or isolated `.env.test` project was available; no database was contacted. |
+
+### Known gaps
+
+- The new SQL function and its aggregates have only static review; replay and result accuracy must be confirmed against synthetic rows in local or dedicated TEST Supabase.
+- The mobilizer “My activity” section is compact and lives in Profile to preserve the four existing bottom tabs. Its server result is constrained to the current mobilizer.
+- Coverage uses active `voter_register` rows where loaded; without register data the coverage percentage is null. Priority stations then sort by lowest entry count.
+- The build still emits the existing large-main-chunk warning; splitting heavy libraries remains in Phase 7.
+- Pre-existing untracked `PROGRESS_AUDIT.md` and `audit/` were not modified or staged.
+
+## HUMAN STEPS
+
+- Apply the Phase 6 migration after the previous migrations, only on local Supabase or the dedicated TEST project.
+- Load a clearly synthetic dataset with entries across wards/stations, support levels, verification states, flags, duplicate attempts, active register rows, and pastor/CHP contacts. Reconcile dashboard totals and coverage to direct SQL counts for each role and filter combination.
+- Verify a coordinator cannot retrieve another ward’s aggregates and a mobilizer cannot retrieve another mobilizer’s metrics or register/contact totals. Check that `log_export` records every dashboard panel download and that all XLSX files open safely.
+- Test the dashboard on a throttled phone-width viewport and record load time/response size before field use. No production DB access, push, or merge has occurred.
