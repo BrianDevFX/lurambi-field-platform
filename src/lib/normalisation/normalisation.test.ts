@@ -4,6 +4,7 @@ import { normaliseNationalId } from './nationalId.ts';
 import { matchWard } from './wardMatcher.ts';
 import { matchPollingPlace } from './placeMatcher.ts';
 import { normaliseSupportLevel } from './supportLevel.ts';
+import { loginIdentifierToEmail, phoneToPseudoEmail } from '../auth/phoneLogin.ts';
 
 describe('Kenyan phone normalization', () => {
   it.each([
@@ -21,6 +22,21 @@ describe('Kenyan phone normalization', () => {
     const result = normaliseKenyanPhone('70000000');
     expect(result.isValid).toBe(false);
     expect(result.flag).toBe('INVALID_PHONE');
+  });
+});
+
+describe('Phone login address', () => {
+  it('maps normalized Kenyan phones to deterministic pseudo-email addresses', () => {
+    expect(phoneToPseudoEmail('0712 345 678')).toBe('254712345678@lurambi.invalid');
+    expect(loginIdentifierToEmail('0712345678')).toBe('254712345678@lurambi.invalid');
+  });
+
+  it('allows the admin real-email login path', () => {
+    expect(loginIdentifierToEmail('Admin@Example.org')).toBe('admin@example.org');
+  });
+
+  it('rejects invalid phone login identifiers', () => {
+    expect(() => phoneToPseudoEmail('12345678')).toThrow('valid Kenyan mobile');
   });
 });
 
