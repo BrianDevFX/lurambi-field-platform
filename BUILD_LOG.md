@@ -93,3 +93,40 @@ Branch: `build/phase-1`, created from the Phase 0 branch. No database was connec
 - Create the first Auth account using a placeholder-safe test email, then run `supabase/bootstrap_admin.example.sql` with that exact email. Create synthetic coordinator, approved mobilizer A, approved mobilizer B, and pending mobilizer test accounts; configure consent wording/version and synthetic places.
 - To execute RLS integration tests, place isolated TEST connection values and test account/fixture values in untracked `.env.test` using the `TEST_*` names documented at the top of `tests/rls/rls.test.js`. The test batch writes synthetic rows to that disposable database.
 - Review the migration SQL and run `supabase/checks/rls_report.sql` in the isolated SQL editor. No deploy, push, or merge has been performed.
+
+## Phase 2 — Auth and mobilizer workflow
+
+Branch: `build/phase-2`, created from Phase 1. The app was not connected to Supabase because no local Supabase CLI/runtime or isolated TEST credentials are available. Runtime auth, RPC, and persistence checks are NOT VERIFIED; no production database was contacted.
+
+### Changes
+
+- Added a browser Supabase client that reads only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Login supports normalized Kenyan phone pseudo-email addresses and a real email path for administrators. Registration uses DB-sourced ward options, creates a pending mobilizer, and submits National ID separately through `complete_mobilizer_registration`, never as Auth metadata.
+- Added session restore, profile lookup with safe column selection, role/status routing, pending/suspended screens, and sign-out after 30 minutes without activity.
+- Connected admin and coordinator mobilizer lists to RLS-protected profiles and approval to `approve_mobilizer`; admin suspension calls `suspend_mobilizer`. Both actions require a reason and are audited by the database RPC.
+- Replaced the active mobilizer prototype with four tabs: Search/Add, My List, My Link, Profile. Capture reads wards/centres/stations and consent policy from Supabase, searches via RPC, submits via `submit_entry`, and displays blocked duplicate details using masked IDs. My List selects only permitted columns and relies on RLS. My Link uses the stored referral code for a QR code and WhatsApp share. The simulated offline tab and unused mock analytics, verification, admin, navigation, and offline views were removed.
+- Added `supabase/migrations/20261107100000_phase2_registration_and_search.sql` for pre-auth ward/station labels, server validation of home-station hierarchy, and full normalized phone search. Added phone-to-pseudo-email unit tests.
+- Updated README for the current Phase 2 behavior and remaining gaps.
+
+### Checks
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
+| `npm test` | PASS — 20 unit tests passed; 10 isolated RLS integration tests skipped without TEST credentials/fixtures. |
+| `npm run build` | PASS — Vite production build completed: main JS 497.83 KB minified / 142.54 KB gzip; no chunk-size warning. |
+| Live login/capture/approval/persistence | NOT VERIFIED — no local Supabase runtime or dedicated TEST credentials were supplied. |
+
+### Known gaps
+
+- The app is now database-backed but is not ready for real supporter data until the migrations are replayed and runtime RLS/Auth tests pass on a local or dedicated TEST database.
+- Capture remains disabled until private ID secrets are inserted and an approved consent text/version is configured. The current Settings UI for that configuration is planned for Phase 4.
+- Referral links are displayed and shareable, but the public `/join/:code` page arrives in Phase 5.
+- Admin/Coordinator currently have mobilizer approval management only; flags, entries, verification, import/export, settings, audit views, and dashboard arrive in later phases.
+- The prototype import wizard and normalisation fixtures remain for Phase 3 replacement; the active Phase 2 flows no longer read local mock records or store entries in browser state.
+
+## HUMAN STEPS
+
+- Apply all migrations through `20261107100000_phase2_registration_and_search.sql` and seed on a local Supabase instance or dedicated TEST project only. Supabase CLI/runtime and TEST credentials are not available in this workspace, so I could not run these steps.
+- Configure `.env.local` with the isolated project URL and anon key, restart Vite, and insert the HMAC/encryption secrets in the private schema. Set the `consent_policy` setting with approved text, a version, and `enabled: true` before capture.
+- Bootstrap the first admin, then create synthetic coordinator, approved mobilizer, and pending mobilizer accounts. Verify phone login, sign-up, approval, capture, duplicate blocking, cross-device persistence, own-entry visibility, referral QR, and idle timeout.
+- Run the isolated RLS integration suite using its documented `.env.test` fixture names. Do not point it at production. No push or merge has been performed.
