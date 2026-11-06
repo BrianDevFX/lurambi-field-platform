@@ -4,6 +4,10 @@ import { AuthView } from './components/auth/AuthView.tsx';
 import { UserManagementView } from './components/admin/UserManagementView.tsx';
 import { NetworkContactsView } from './components/admin/NetworkContactsView.tsx';
 import { ImportWizard } from './components/importer/ImportWizard.tsx';
+import { AdminOperationsView } from './components/admin/AdminOperationsView.tsx';
+import { ExportCenter } from './components/admin/ExportCenter.tsx';
+import { CoordinatorEntriesView } from './components/admin/CoordinatorEntriesView.tsx';
+import { PlacesAdminView } from './components/admin/PlacesAdminView.tsx';
 import { MobilizerDashboard } from './components/mobilizer/MobilizerDashboard.tsx';
 import { supabase } from './lib/supabase/client.ts';
 import { Profile } from './types/index.ts';
@@ -54,12 +58,21 @@ function CompleteRegistration({ onComplete }: { onComplete: () => void }) {
 }
 
 function AdminWorkspace({ currentProfile }: { currentProfile: Profile }) {
-  const [tab, setTab] = useState<'mobilizers' | 'import' | 'contacts'>('mobilizers');
+  const adminTabs = ['mobilizers', 'import', 'places', 'contacts', 'operations', 'exports'] as const;
+  const coordinatorTabs = ['mobilizers', 'entries', 'exports'] as const;
+  const availableTabs = currentProfile.role === 'admin' ? adminTabs : coordinatorTabs;
+  const [tab, setTab] = useState<string>('mobilizers');
   return <div className="space-y-5">
     <nav aria-label="Admin sections" className="flex gap-2 overflow-x-auto border-b border-slate-200">
-      {(['mobilizers', 'import', 'contacts'] as const).map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold capitalize ${tab === item ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-slate-600'}`}>{item === 'contacts' ? 'Network contacts' : item === 'import' ? 'Import / Places' : 'Mobilizers'}</button>)}
+      {availableTabs.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold capitalize ${tab === item ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-slate-600'}`}>{item === 'contacts' ? 'Network contacts' : item === 'import' ? 'Import' : item === 'places' ? 'Places' : item === 'entries' ? 'Entries' : item === 'operations' ? 'Admin operations' : item === 'exports' ? 'Exports' : currentProfile.role === 'ward_coordinator' ? 'Mobilizers in ward' : 'Mobilizers'}</button>)}
     </nav>
-    {tab === 'mobilizers' ? <UserManagementView currentProfile={currentProfile} /> : tab === 'import' ? <ImportWizard /> : <NetworkContactsView />}
+    {tab === 'mobilizers' ? <UserManagementView currentProfile={currentProfile} />
+      : tab === 'import' && currentProfile.role === 'admin' ? <ImportWizard />
+      : tab === 'contacts' && currentProfile.role === 'admin' ? <NetworkContactsView />
+      : tab === 'places' && currentProfile.role === 'admin' ? <PlacesAdminView />
+      : tab === 'operations' && currentProfile.role === 'admin' ? <AdminOperationsView />
+      : tab === 'entries' && currentProfile.role === 'ward_coordinator' ? <CoordinatorEntriesView />
+      : <ExportCenter role={currentProfile.role} />}
   </div>;
 }
 
