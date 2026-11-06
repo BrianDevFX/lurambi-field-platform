@@ -130,3 +130,38 @@ Branch: `build/phase-2`, created from Phase 1. The app was not connected to Supa
 - Configure `.env.local` with the isolated project URL and anon key, restart Vite, and insert the HMAC/encryption secrets in the private schema. Set the `consent_policy` setting with approved text, a version, and `enabled: true` before capture.
 - Bootstrap the first admin, then create synthetic coordinator, approved mobilizer, and pending mobilizer accounts. Verify phone login, sign-up, approval, capture, duplicate blocking, cross-device persistence, own-entry visibility, referral QR, and idle timeout.
 - Run the isolated RLS integration suite using its documented `.env.test` fixture names. Do not point it at production. No push or merge has been performed.
+
+## Phase 3 — Real import
+
+Branch: `build/phase-3`, based on `build/phase-2`. Phase commits: `859b734` (database import operations) and `a6a82c4` (admin import/contact UI). Nothing was pushed or merged. No local Supabase runtime or dedicated TEST credentials were available; no database was contacted.
+
+### Changes
+
+- Replaced the timer-based import prototype with XLSX/CSV validation (5 MB and 20,000-row limits), dynamic `xlsx` loading, header detection, editable per-sheet column mapping, 20-row previews, database dry run, 500-row commits, actual RPC-driven progress, and XLSX row reports. IDs are masked in the preview and omitted from the report. Exported report cells are neutralized for spreadsheet formula injection.
+- Added admin tabs for mobilizer management, import/places, and network contacts. The contacts screen reads through limited selects and saves ward/station assignment, reach status, notes and CHP export exclusion via an audited RPC requiring a reason.
+- Added migration `supabase/migrations/20261106150000_phase3_import_operations.sql`: audited alias and contact update RPCs, place batch import, row preview, legacy “not found” import status mapping, and minimal authenticated grants. Place rows are processed ward → centre → station; the first committed place batch removes only explicitly synthetic centres/stations.
+- Added an admin “Needs mapping” workflow from unmapped preview rows. It lets an admin select canonical places, saves aliases through the audited RPC, and reruns preview.
+- No new dependencies were added. Existing `npm test` includes 10 RLS integration cases that skip without TEST credentials.
+
+### Checks
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
+| `npm test` | PASS — 20 passed; 10 RLS tests skipped because no isolated DB credentials/runtime are available. |
+| `npm run build` | PASS — Vite production build completed. Main JS 518.68 KB minified / 147.93 KB gzip; dynamic XLSX chunk 491.99 KB / 160.33 KB gzip. Vite warns that a chunk exceeds 500 KB minified. |
+| Database migration replay / import RPCs / synthetic workbook | NOT VERIFIED — no local/test database was available. |
+
+### Known gaps
+
+- The existing database dry-run branches validate and count rows but do not execute the complete insert/duplicate-trigger path in a rollback transaction. The preview is useful for mapping/format issues but cannot certify duplicate blocking or every commit-time outcome; rely on commit response/errors and test the migration on isolated Supabase before field use.
+- Network-contact import maps polling-station labels against the database station names in the browser; repeated station names across wards may need manual review. The import summary/report is preview-derived and is not a server-generated row-by-row commit receipt.
+- Synthetic place replacement drops references to synthetic centres/stations (foreign keys null those references). Apply and test with a disposable database first, then verify the official place list before importing real supporter data.
+- No runtime check confirms role grants, RLS behavior, alias resolution, import idempotency, transaction behavior, or audit-log output for these new RPCs. No production database was used.
+- Main bundle remains above Vite’s 500 KB warning threshold; performance splitting is scheduled for Phase 7.
+
+## HUMAN STEPS
+
+- Apply migrations through `20261106150000_phase3_import_operations.sql` and seed only a local Supabase instance or the dedicated TEST project. Insert the two private DB secrets as described in README; do not put them in env files.
+- Use synthetic admin/coordinator/mobilizer accounts. Import a synthetic workbook with entries, duplicate rows, “not found”, contacts, and ward/centre/station sheets. Verify dry-run versus commit results, a second identical import, alias save/re-preview, CHP exclusion, contact update audit events, and replacement of synthetic places.
+- Run the RLS suite and confirm the full synthetic import workflow before loading real records. No push, merge, or production DB access has occurred.
