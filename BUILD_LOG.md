@@ -279,3 +279,44 @@ Branch: `build/phase-6`, created from `build/phase-5`. No push, merge, or databa
 - Load a clearly synthetic dataset with entries across wards/stations, support levels, verification states, flags, duplicate attempts, active register rows, and pastor/CHP contacts. Reconcile dashboard totals and coverage to direct SQL counts for each role and filter combination.
 - Verify a coordinator cannot retrieve another ward’s aggregates and a mobilizer cannot retrieve another mobilizer’s metrics or register/contact totals. Check that `log_export` records every dashboard panel download and that all XLSX files open safely.
 - Test the dashboard on a throttled phone-width viewport and record load time/response size before field use. No production DB access, push, or merge has occurred.
+
+## Phase 7 — Offline, performance and hardening
+
+Branch: `build/phase-7`, created from `build/phase-6`. No production database, push, or merge was used.
+
+### Changes
+
+- Added `vite-plugin-pwa` with a generated installable manifest and service worker. The app shell and static route chunks are precached; large XLSX/PDF chunks and `/api` navigation are excluded. Added the app icon at `public/pwa.svg`.
+- Replaced the unused `recharts` dependency and two unreferenced report modules with code splitting: admin, public, coordinator, mobilizer, import and export screens load on demand; XLSX/PDF libraries remain dynamically imported. Removed unused `src/lib/reports/excelExport.ts` and `src/lib/reports/pdfGenerator.ts` after confirming no imports. Ran `npm prune`.
+- Completed the mobilizer offline flow: caches capture options and an approved mobilizer profile in IndexedDB; drafts retain a `client_request_id`; connectivity/visibility events retry `submit_entry`; each item shows waiting, syncing, saved, duplicate-blocked or error state. A queued draft is retained until the database returns a confirmed save or blocking duplicate. It never stores a raw National ID; offline capture with a populated ID is refused with a clear instruction to retry online or clear it.
+- Added limited My List pagination and skeleton loading states. Updated README with PWA/offline behavior, Vercel setup, compliance checklist and a synthetic preview smoke checklist.
+- Files changed: `vite.config.ts`, `src/main.tsx`, `src/vite-env.d.ts`, `public/pwa.svg`, `src/App.tsx`, `src/components/capture/CaptureWizard.tsx`, `src/components/dashboard/DashboardView.tsx`, `src/components/mobilizer/MobilizerDashboard.tsx`, `src/lib/offline/offlineQueue.ts`, `src/lib/reports/excelExport.ts` (removed), `src/lib/reports/pdfGenerator.ts` (removed), `package.json`, `package-lock.json`, `README.md`, `BUILD_LOG.md`.
+
+### Checks
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
+| `npm test` | PASS — 20 passed; 10 Supabase RLS integration tests skipped without isolated database credentials/runtime. |
+| `npm run build` | PASS — PWA manifest and service worker generated; 21 entries, 804.71 KiB precached. First JS entry 460.00 KB minified / 130.91 KB gzip; XLSX 491.99 KB / 160.33 KB gzip; jsPDF 399.69 KB / 129.91 KB gzip. No chunk-size warning. |
+| `npm prune` | PASS — unused `recharts` removed; install tree pruned. |
+| `npm audit --json` | PASS — 0 vulnerabilities reported. |
+| `git diff --check` | PASS — no whitespace errors; Git reports configured LF-to-CRLF conversion warnings. |
+| Static bundle/security scan | PASS for checked items: no server helper/secret-name import in `src`, no secret environment prefixes in client source, no service-secret variable names in `dist`, no direct Supabase table mutations in browser source, `.env*` is ignored. |
+| Service-worker runtime/offline sync, RLS roles, Vercel preview headers, Excel app behavior | NOT VERIFIED — no browser+isolated Supabase project or deployed preview was available; no database was contacted. |
+
+### Security history finding and known gaps
+
+- A historical assignment to `SUPABASE_SERVICE_ROLE_KEY` appears in `.env.example` at commit `5d51997f` (patch line 27). I did not print or copy its value. Static classification was inconclusive, so treat it as a possible credential until a human reviews the historical file. The current `.env.example` contains blank agreed variables; the local populated `.env.local` is ignored and was not modified. No secret was added by this phase.
+- A separate historical `ID_HASH_SALT` identifier was found in an earlier documentation/config commit; the current tree and browser bundle contain no `ID_HASH_SALT` or `CAMPAIGN_SALT` name. Review/purge history if the prior literal was ever a real value.
+- Offline and PWA code passes typecheck/build but has not been tested in an installed browser across reload, offline capture, reconnect, duplicate response, account switch or failed response. Confirm no unsynced queue is lost before field use.
+- No isolated Supabase project was present: the ten database-backed tests remain skipped, and role scope, RPC idempotency, and queue server responses are NOT VERIFIED.
+- No deployed Vercel preview was available to verify headers. Static `vercel.json` continues to define CSP, HSTS, content-type, frame, referrer, and permissions headers.
+- Pre-existing untracked `PROGRESS_AUDIT.md` and `audit/` were not modified or staged.
+
+## HUMAN STEPS
+
+- Before pushing any branch, review the historical `.env.example` assignment at commit `5d51997f` for `SUPABASE_SERVICE_ROLE_KEY`, and the earlier `ID_HASH_SALT` history. If either was a real secret, rotate/revoke it and purge it from all local refs/history with a reviewed `git-filter-repo` procedure; do not push until the rewritten history and current tree are rescanned. The candidate values have intentionally not been printed in this log.
+- In an isolated local/TEST Supabase environment, apply all migrations and run the RLS suite. With synthetic users, install the preview PWA, sign in as a mobilizer, load capture options, go offline, queue a pending-ID draft, reload, reconnect, and verify it stays visible until server-confirmed. Also test duplicate-blocked, transient RPC error, sign-out/account switch and retry.
+- On a deployed preview, verify security headers, PWA installation on Android, routing after launch, and public forms. Inspect client bundles and IndexedDB to confirm no server key or raw National ID is present.
+- Check the synthetic export workbooks in spreadsheet software and test mobile load with network throttling. No production data was used; no push or merge occurred.

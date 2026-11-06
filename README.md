@@ -42,6 +42,15 @@ npm run build
 
 Vercel serves the Vite SPA from `dist/`; `vercel.json` rewrites browser routes to `index.html` and sets security headers. `/api/join` serves the public referral form and `/api/dsr` accepts data-subject requests. Both require server-only Supabase and Turnstile configuration and use database-backed rate limits. Configure all six variables in Vercel with the correct browser/server scopes.
 
+## Preview and production setup
+
+1. Create a Supabase project and apply the versioned migrations in order. Use local Supabase or a dedicated TEST project until the smoke checks below pass; never run these checks against production data.
+2. In the Supabase SQL editor, insert independently generated ID HMAC and encryption keys using the instructions in `supabase/setup_secrets.example.sql`. Bootstrap the first administrator using `supabase/bootstrap_admin.example.sql`, replacing its placeholder email with the approved account. Do not commit populated SQL or secret values.
+3. Configure Vercel browser variables `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_TURNSTILE_SITE_KEY`. Configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `TURNSTILE_SECRET_KEY` only as server-side Vercel variables. Add the preview/production hostnames to the Cloudflare Turnstile site configuration.
+4. Set approved consent wording and version in the admin Settings screen, then deploy a preview and test with synthetic accounts and records. Do not use real supporter data until authorization, RLS, public forms, exports, offline sync, and security headers have been reviewed.
+
+The installable PWA caches the application shell and static route chunks. Offline capture drafts use IndexedDB and contain no National ID. Drafts sync when the app is open and connectivity returns; each remains visible until the server confirms it was saved or blocked. The browser must remain signed in as the mobilizer who created the draft for sync to succeed.
+
 ## Data handling and compliance
 
 - Use only synthetic fixtures in development and tests.
@@ -49,7 +58,17 @@ Vercel serves the Vite SPA from `dist/`; `vercel.json` rewrites browser routes t
 - National IDs are HMAC-hashed and encrypted inside database functions with keys held only in `private.app_secrets`.
 - Before production use, complete the campaign's data-protection obligations, including ODPC registration where required, approved consent and privacy wording, retention rules, a data-subject request process, and opt-in before bulk outreach.
 - Real supporter data may only be loaded after the authorization, consent, persistence, and field workflows are implemented and reviewed.
+- Confirm the campaign is registered with the Office of the Data Protection Commissioner as a data controller where required, and do not send bulk SMS without opt-in.
+
+## Preview smoke checks
+
+- Sign in with synthetic Admin, Ward Coordinator, and Mobilizer accounts; confirm each role sees only its permitted data.
+- Capture an entry online and offline. Verify that a queued draft syncs once, duplicate submissions show `duplicate-blocked`, errors remain queued, and a Mobilizer still cannot edit or delete records.
+- Verify admin edits include a reason and appear in the audit log; verify coordinator filters and exports remain ward-scoped.
+- Test synthetic import dry run/commit, to-verify export, XLSX/CSV/PDF exports, public referral registration, consent, Turnstile, Privacy Notice, and DSR queue.
+- Install the PWA, reopen it offline after a successful mobilizer sign-in, capture a pending-ID draft, reconnect, and confirm the server result before dismissing the queued result.
+- Inspect the deployed preview for CSP, HSTS, content-type, frame, referrer, and permissions headers. Confirm no service-role key or National ID appears in browser bundles or IndexedDB.
 
 ## Phase status
 
-Phases 1–5 add the schema/RLS and protected RPCs, authenticated role flows, import operations, admin review and exports, and public join/privacy/DSR workflows. Analytics and offline/performance hardening remain for later phases. Migrations, RLS, role flows, imports, public forms, rate limits, Turnstile, and audit behavior still need runtime verification against a local or dedicated TEST Supabase project before real supporter data is used. For public forms, set `settings.consent_policy` to an enabled policy with a version and consent text; optional `text_sw` provides the Kiswahili text.
+Phases 1–7 add the schema/RLS and protected RPCs, authenticated role flows, import operations, admin review and exports, public join/privacy/DSR workflows, aggregate dashboards, PWA shell, offline draft queue, and code splitting. Migrations, RLS, role flows, imports, public forms, dashboard aggregates, offline sync, Turnstile, and audit behavior still need runtime verification against local or dedicated TEST Supabase before real supporter data is used. For public forms, set `settings.consent_policy` to an enabled policy with a version and consent text; optional `text_sw` provides the Kiswahili text.
