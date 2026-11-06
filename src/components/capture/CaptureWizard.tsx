@@ -29,7 +29,9 @@ export function CaptureWizard({ profile, onEntryAdded }: CaptureWizardProps) {
   const [centreId, setCentreId] = useState('');
   const [stationId, setStationId] = useState('');
   const [support, setSupport] = useState<SupportLevel>('not_assessed');
-  const [issues, setIssues] = useState('');
+  const [issues, setIssues] = useState<string[]>([]);
+  const [otherIssue, setOtherIssue] = useState('');
+  const [issueCategories, setIssueCategories] = useState(['Transport', 'Healthcare', 'Education', 'Water', 'Roads', 'Jobs']);
   const [needsTransport, setNeedsTransport] = useState(false);
   const [hasPvc, setHasPvc] = useState(false);
   const [notes, setNotes] = useState('');
@@ -44,20 +46,22 @@ export function CaptureWizard({ profile, onEntryAdded }: CaptureWizardProps) {
     let active = true;
     async function loadOptions() {
       setLoadingPlaces(true);
-      const [wardResult, centreResult, stationResult, consentResult] = await Promise.all([
+      const [wardResult, centreResult, stationResult, consentResult, issueResult] = await Promise.all([
         supabase!.from('wards').select('id,name').order('name'),
         supabase!.from('polling_centres').select('id,name,ward_id').order('name'),
         supabase!.from('polling_stations').select('id,station_name,ward_id,polling_centre_id').order('station_number'),
         supabase!.from('settings').select('value').eq('key', 'consent_policy').maybeSingle(),
+        supabase!.from('settings').select('value').eq('key', 'issue_categories').maybeSingle(),
       ]);
       if (!active) return;
-      const queryError = wardResult.error || centreResult.error || stationResult.error || consentResult.error;
+      const queryError = wardResult.error || centreResult.error || stationResult.error || consentResult.error || issueResult.error;
       if (queryError) setLoadError(queryError.message);
       else {
         setWards(wardResult.data || []);
         setCentres((centreResult.data || []).map((row) => ({ ...row, name: row.name })));
         setStations((stationResult.data || []).map((row) => ({ ...row, name: row.station_name })));
         setConsent((consentResult.data?.value || null) as ConsentPolicy | null);
+        if (Array.isArray(issueResult.data?.value)) setIssueCategories(issueResult.data.value.filter((item): item is string => typeof item === 'string'));
         if (!wardId && wardResult.data?.[0]) setWardId(wardResult.data[0].id);
       }
       setLoadingPlaces(false);
@@ -104,7 +108,7 @@ export function CaptureWizard({ profile, onEntryAdded }: CaptureWizardProps) {
       p_polling_centre_label: null,
       p_polling_station_label: null,
       p_support_level: support,
-      p_issues: issues.split(',').map((item) => item.trim()).filter(Boolean),
+      p_issues: [...issues, ...(otherIssue.trim() ? [otherIssue.trim()] : [])],
       p_needs_transport: needsTransport,
       p_has_pvc: hasPvc,
       p_notes: notes.trim() || null,
@@ -139,7 +143,7 @@ export function CaptureWizard({ profile, onEntryAdded }: CaptureWizardProps) {
       phone_e164: phoneResult?.isValid ? phoneResult.phone_e164 || undefined : undefined,
       id_masked: data.id_masked || undefined,
       support_level: support,
-      issues: issues.split(',').map((item) => item.trim()).filter(Boolean),
+      issues: [...issues, ...(otherIssue.trim() ? [otherIssue.trim()] : [])],
       needs_transport: needsTransport,
       has_pvc: hasPvc,
       notes: notes.trim() || undefined,
@@ -153,7 +157,7 @@ export function CaptureWizard({ profile, onEntryAdded }: CaptureWizardProps) {
     };
     setSaved(entry);
     onEntryAdded(entry);
-    setName(''); setPhone(''); setNotes(''); setIssues(''); setConsentChecked(false);
+    setName(''); setPhone(''); setNotes(''); setIssues([]); setOtherIssue(''); setConsentChecked(false);
     setNeedsTransport(false); setHasPvc(false);
   }
 
@@ -218,9 +222,7 @@ export function CaptureWizard({ profile, onEntryAdded }: CaptureWizardProps) {
               {supportLevels.map((level) => <option key={level} value={level}>{level.replaceAll('_', ' ')}</option>)}
             </select>
           </label>
-          <label className="block text-sm font-medium text-slate-700">Issues (comma separated)
-            <input value={issues} onChange={(event) => setIssues(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" />
-          </label>
+          <fieldset className="space-y-2"><legend className="text-sm font-medium text-slate-700">Issues</legend><div className="flex flex-wrap gap-3">{issueCategories.map((category) => <label key={category} className="flex items-center gap-1.5 text-sm text-slate-700"><input type="checkbox" checked={issues.includes(category)} onChange={(event) => setIssues((current) => event.target.checked ? [...current, category] : current.filter((item) => item !== category))} />{category}</label>)}</div><label className="block text-xs text-slate-600">Other<input value={otherIssue} onChange={(event) => setOtherIssue(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" /></label></fieldset>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-slate-700">
           <label className="flex items-center gap-2"><input type="checkbox" checked={needsTransport} onChange={(event) => setNeedsTransport(event.target.checked)} />Needs transport</label>

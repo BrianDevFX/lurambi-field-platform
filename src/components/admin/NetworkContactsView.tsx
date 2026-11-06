@@ -11,20 +11,24 @@ export function NetworkContactsView() {
   const [selected, setSelected] = useState<Contact | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [neutralityNote, setNeutralityNote] = useState('CHP contacts are politically neutral and must remain outside campaign activity.');
   const [busy, setBusy] = useState(false);
 
   async function load() {
     if (!supabase) return;
-    const [contactResult, wardResult, stationResult] = await Promise.all([
+    const [contactResult, wardResult, stationResult, noteResult] = await Promise.all([
       supabase.from('network_contacts').select('id,type,name,phone_e164,denomination,community_unit,ward_id,polling_station_id,reach_status,notes,exclude_from_campaign_exports').order('name').limit(500),
       supabase.from('wards').select('id,name').order('name'),
       supabase.from('polling_stations').select('id,station_name').order('station_name'),
+      supabase.from('settings').select('value').eq('key','chp_compliance_note').maybeSingle(),
     ]);
-    const loadError = contactResult.error || wardResult.error || stationResult.error;
+    const loadError = contactResult.error || wardResult.error || stationResult.error || noteResult.error;
     if (loadError) { setError(loadError.message); return; }
     setContacts((contactResult.data || []) as Contact[]);
     setWards((wardResult.data || []).map((row) => ({ id: row.id, name: row.name })));
     setStations((stationResult.data || []).map((row) => ({ id: row.id, name: row.station_name })));
+    const noteValue = noteResult.data?.value as {text?:string}|undefined;
+    if (noteValue?.text) setNeutralityNote(noteValue.text);
   }
 
   useEffect(() => { void load(); }, []);
@@ -54,7 +58,7 @@ export function NetworkContactsView() {
         {selected.type === 'chp' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.exclude_from_campaign_exports} onChange={(event) => setSelected({ ...selected, exclude_from_campaign_exports: event.target.checked })} />Exclude from campaign exports</label>}</div>
       <label className="block text-sm">Notes<textarea rows={2} value={selected.notes || ''} onChange={(event) => setSelected({ ...selected, notes: event.target.value })} className="mt-1 w-full rounded border p-2" /></label>
       <label className="block text-sm">Reason (required)<input required value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1 w-full rounded border p-2" /></label>
-      <p className="text-xs text-slate-500">CHP contacts are politically neutral and must remain outside campaign activity.</p>
+      <p className="text-xs text-slate-500">{neutralityNote}</p>
       <div className="flex gap-2"><button disabled={busy || !reason.trim()} className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button><button type="button" onClick={() => setSelected(null)} className="rounded border px-4 py-2 text-sm">Cancel</button></div>
     </form>}
   </section>;

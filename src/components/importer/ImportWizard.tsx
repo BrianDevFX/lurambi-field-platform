@@ -220,10 +220,27 @@ export function ImportWizard() {
   }
 
   async function downloadReport() {
+    if (!supabase) return;
+    const filename = `${fileName.replace(/\.[^.]+$/, '')}-import-report.xlsx`;
+    const { error: logError } = await supabase.rpc('log_export', { p_export_type: 'import_report', p_format: 'xlsx', p_filters: {}, p_row_count: (dryRunReport || report).length, p_file_name: filename });
+    if (logError) { setError(logError.message); return; }
     const XLSX = await import('xlsx');
     const rows = (dryRunReport || report).map((row) => ({ Sheet: safeCell(row.sheet), Row: row.row, Status: safeCell(row.status), Reason: safeCell(row.reason) }));
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows), 'Import report');
-    XLSX.writeFile(book, `${fileName.replace(/\.[^.]+$/, '')}-import-report.xlsx`);
+    XLSX.writeFile(book, filename);
+  }
+
+  async function downloadTemplate() {
+    if (!supabase) return;
+    const filename = 'lurambi-import-template.xlsx';
+    const { error: logError } = await supabase.rpc('log_export', { p_export_type: 'import_template', p_format: 'xlsx', p_filters: {}, p_row_count: 0, p_file_name: filename });
+    if (logError) { setError(logError.message); return; }
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['name','national_id','phone','ward','polling_centre','polling_station','support_level','captured_on','issues','needs_transport','has_pvc','notes']]), 'Entries');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['type','name','phone','national_id','ward','polling_station','denomination','community_unit','reach_status','notes','exclude_from_campaign_exports']]), 'Network contacts');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['type','name','code','ward','polling_centre','station_number','registered_voters','total_registered_voters','county_name','constituency_name']]), 'Places');
+    XLSX.writeFile(workbook, filename);
   }
 
   const counts = (dryRunReport || report).reduce<Record<string, number>>((result, row) => { result[row.status] = (result[row.status] || 0) + 1; return result; }, {});
@@ -247,6 +264,7 @@ export function ImportWizard() {
         <button disabled={busy || !dryRunReport} onClick={() => void runImport(false)} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Commit import</button>
         <button disabled={busy || !dryRunReport} onClick={() => void downloadReport()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">Download report</button>
       </div>}
+      <button onClick={() => void downloadTemplate()} className="text-sm font-semibold text-emerald-800 underline">Download import templates</button>
       {(busy || phase === 'committed') && <div><div className="h-2 overflow-hidden rounded bg-slate-200"><div className="h-full bg-emerald-600" style={{ width: `${progress}%` }} /></div><p className="mt-1 text-xs text-slate-600">{progress}% {phase === 'committed' ? 'complete' : 'processed'}</p></div>}
       {dryRunReport && <div className="flex flex-wrap gap-3 text-sm">{['imported', 'merged', 'rejected', 'flagged', 'unmapped'].map((status) => <span key={status} className="rounded bg-slate-100 px-2 py-1">{status}: {counts[status] || 0}</span>)}</div>}
       {dryRunReport && unmappedAliases.length > 0 && <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { supabase } from '../../lib/supabase/client.ts';
 
 interface ReferralViewProps {
   referralCode?: string;
@@ -10,6 +11,7 @@ export function ReferralView({ referralCode, mobilizerName }: ReferralViewProps)
   const [qr, setQr] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [messageTemplate, setMessageTemplate] = useState('Join through {name} supporter link: {url}');
   const url = referralCode ? `${window.location.origin}/join/${encodeURIComponent(referralCode)}` : '';
 
   useEffect(() => {
@@ -21,6 +23,12 @@ export function ReferralView({ referralCode, mobilizerName }: ReferralViewProps)
     return () => { active = false; };
   }, [url]);
 
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.from('settings').select('value').eq('key','share_message_template').maybeSingle()
+      .then(({data}) => { const value = data?.value as {text?:string}|undefined; if (value?.text?.trim()) setMessageTemplate(value.text); });
+  }, []);
+
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(url);
@@ -31,7 +39,7 @@ export function ReferralView({ referralCode, mobilizerName }: ReferralViewProps)
     }
   }
 
-  const message = `Join through ${mobilizerName || 'my'} supporter link: ${url}`;
+  const message = messageTemplate.replaceAll('{name}', mobilizerName || 'my').replaceAll('{url}', url);
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
 
   if (!referralCode) return <section className="rounded-xl border border-amber-200 bg-white p-5">
