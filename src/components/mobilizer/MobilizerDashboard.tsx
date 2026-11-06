@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { Link2, List, Search, UserRound } from 'lucide-react';
 import { CaptureWizard } from '../capture/CaptureWizard.tsx';
 import { ReferralView } from '../referral/ReferralView.tsx';
 import { supabase } from '../../lib/supabase/client.ts';
-import { ExportCenter } from '../admin/ExportCenter.tsx';
 import { DashboardView } from '../dashboard/DashboardView.tsx';
 import { Entry, Profile } from '../../types/index.ts';
+
+const ExportCenter = lazy(() => import('../admin/ExportCenter.tsx').then((module) => ({ default: module.ExportCenter })));
 
 type Tab = 'capture' | 'list' | 'link' | 'profile';
 type RawEntry = Omit<Entry, 'ward_name' | 'polling_centre_name' | 'polling_station_name'>;
@@ -19,35 +20,45 @@ export function MobilizerDashboard({ profile, onSignOut }: MobilizerDashboardPro
   const [tab, setTab] = useState<Tab>('capture');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const loadedCount = useRef(0);
 
-  const loadEntries = useCallback(async () => {
+  const loadEntries = useCallback(async (append = false) => {
     if (!supabase) return;
     setLoading(true);
     setError('');
+    const offset = append ? loadedCount.current : 0;
     const [entryResult, wardResult, centreResult, stationResult] = await Promise.all([
       supabase.from('entries')
         .select('id,mobilizer_id,ward_filed_id,polling_centre_id,polling_station_id,name,phone_e164,id_masked,support_level,issues,needs_transport,has_pvc,notes,consent_at,consent_text_version,consent_status,source,verification_status,captured_on,flags')
-        .order('captured_on', { ascending: false }).range(0, 49),
+        .order('captured_on', { ascending: false }).range(offset, offset + 49),
       supabase.from('wards').select('id,name'),
       supabase.from('polling_centres').select('id,name'),
       supabase.from('polling_stations').select('id,station_name'),
     ]);
     if (entryResult.error || wardResult.error || centreResult.error || stationResult.error) {
       setError((entryResult.error || wardResult.error || centreResult.error || stationResult.error)!.message);
-      setEntries([]);
+      if (!append) { setEntries([]); loadedCount.current = 0; }
+      setHasMore(false);
     } else {
       const wards = new Map((wardResult.data || []).map((row) => [row.id, row.name]));
       const centres = new Map((centreResult.data || []).map((row) => [row.id, row.name]));
       const stations = new Map((stationResult.data || []).map((row) => [row.id, row.station_name]));
-      setEntries(((entryResult.data || []) as RawEntry[]).map((entry) => ({
+      const nextEntries = ((entryResult.data || []) as RawEntry[]).map((entry) => ({
         ...entry,
         ward_name: wards.get(entry.ward_filed_id) || '',
         polling_centre_name: entry.polling_centre_id ? centres.get(entry.polling_centre_id) : undefined,
         polling_station_name: entry.polling_station_id ? stations.get(entry.polling_station_id) : undefined,
         mobilizer_name: profile.full_name,
-      })));
+      }));
+      setEntries((current) => {
+        const next = append ? [...current, ...nextEntries] : nextEntries;
+        loadedCount.current = next.length;
+        return next;
+      });
+      setHasMore((entryResult.data || []).length === 50);
     }
     setLoading(false);
   }, [profile.full_name]);
@@ -64,13 +75,13 @@ export function MobilizerDashboard({ profile, onSignOut }: MobilizerDashboardPro
   ];
 
   return <div className="pb-24">
-    {tab === 'capture' && <CaptureWizard profile={profile} onEntryAdded={() => setRefresh((value) => value + 1)} />}
+    <div hidden={tab !== 'capture'}><CaptureWizard profile={profile} onEntryAdded={() => setRefresh((value) => value + 1)} /></div>
 
     {tab === 'list' && <section className="space-y-3">
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">My entries</h2><button onClick={() => void loadEntries()} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Refresh</button></div>
       <details className="rounded-xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-800">Export my entries</summary><div className="mt-3"><ExportCenter role="mobilizer" /></div></details>
       {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-      {loading ? <p className="rounded-xl bg-white p-5 text-sm text-slate-600">Loading entries…</p> : entries.length === 0 ? (
+      {loading && entries.length === 0 ? <div role="status" aria-label="Loading entries" className="animate-pulse space-y-2">{[0,1,2].map((item)=><div key={item} className="h-24 rounded-xl bg-white" />)}</div> : entries.length === 0 ? (
         <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">No entries yet.</p>
       ) : entries.map((entry) => <article key={entry.id} className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -84,6 +95,7 @@ export function MobilizerDashboard({ profile, onSignOut }: MobilizerDashboardPro
         {entry.flags.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{entry.flags.map((flag) => <span key={flag} className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900">{flag.replaceAll('_', ' ')}</span>)}</div>}
         <p className="mt-3 text-xs text-slate-500">Submitted entries cannot be edited or deleted.</p>
       </article>)}
+      {hasMore && <button disabled={loading} onClick={() => void loadEntries(true)} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50">{loading ? 'Loading…' : 'Load more'}</button>}
     </section>}
 
     {tab === 'link' && <ReferralView referralCode={profile.referral_code} mobilizerName={profile.full_name} />}

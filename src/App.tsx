@@ -1,18 +1,26 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { AuthView } from './components/auth/AuthView.tsx';
-import { UserManagementView } from './components/admin/UserManagementView.tsx';
-import { NetworkContactsView } from './components/admin/NetworkContactsView.tsx';
-import { ImportWizard } from './components/importer/ImportWizard.tsx';
-import { AdminOperationsView } from './components/admin/AdminOperationsView.tsx';
-import { ExportCenter } from './components/admin/ExportCenter.tsx';
-import { CoordinatorEntriesView } from './components/admin/CoordinatorEntriesView.tsx';
-import { PlacesAdminView } from './components/admin/PlacesAdminView.tsx';
-import { DashboardView } from './components/dashboard/DashboardView.tsx';
-import { DataSubjectRequestPage, JoinPage, PrivacyNoticePage } from './components/public/PublicPages.tsx';
-import { MobilizerDashboard } from './components/mobilizer/MobilizerDashboard.tsx';
 import { supabase } from './lib/supabase/client.ts';
+import { cacheMobilizerProfile, getCachedMobilizerProfile } from './lib/offline/offlineQueue.ts';
 import { Profile } from './types/index.ts';
+
+const UserManagementView = lazy(() => import('./components/admin/UserManagementView.tsx').then((module) => ({ default: module.UserManagementView })));
+const NetworkContactsView = lazy(() => import('./components/admin/NetworkContactsView.tsx').then((module) => ({ default: module.NetworkContactsView })));
+const ImportWizard = lazy(() => import('./components/importer/ImportWizard.tsx').then((module) => ({ default: module.ImportWizard })));
+const AdminOperationsView = lazy(() => import('./components/admin/AdminOperationsView.tsx').then((module) => ({ default: module.AdminOperationsView })));
+const ExportCenter = lazy(() => import('./components/admin/ExportCenter.tsx').then((module) => ({ default: module.ExportCenter })));
+const CoordinatorEntriesView = lazy(() => import('./components/admin/CoordinatorEntriesView.tsx').then((module) => ({ default: module.CoordinatorEntriesView })));
+const PlacesAdminView = lazy(() => import('./components/admin/PlacesAdminView.tsx').then((module) => ({ default: module.PlacesAdminView })));
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView.tsx').then((module) => ({ default: module.DashboardView })));
+const MobilizerDashboard = lazy(() => import('./components/mobilizer/MobilizerDashboard.tsx').then((module) => ({ default: module.MobilizerDashboard })));
+const DataSubjectRequestPage = lazy(() => import('./components/public/PublicPages.tsx').then((module) => ({ default: module.DataSubjectRequestPage })));
+const JoinPage = lazy(() => import('./components/public/PublicPages.tsx').then((module) => ({ default: module.JoinPage })));
+const PrivacyNoticePage = lazy(() => import('./components/public/PublicPages.tsx').then((module) => ({ default: module.PrivacyNoticePage })));
+
+function PageLoading() {
+  return <main className="min-h-screen bg-slate-50 p-4"><div className="mx-auto max-w-3xl animate-pulse space-y-3 rounded-xl bg-white p-5"><div className="h-5 w-1/3 rounded bg-slate-200"/><div className="h-4 w-2/3 rounded bg-slate-100"/><div className="h-24 rounded bg-slate-100"/></div></main>;
+}
 
 function CompleteRegistration({ onComplete }: { onComplete: () => void }) {
   const [nationalId, setNationalId] = useState('');
@@ -92,7 +100,15 @@ function AuthenticatedApp() {
       .select('id,email,full_name,phone_e164,national_id_masked,role,status,home_ward_id,referral_code')
       .eq('id', userId)
       .maybeSingle();
-    if (error) setLoadError(error.message);
+    if (error) {
+      if (!navigator.onLine) {
+        try {
+          const cached = await getCachedMobilizerProfile(userId);
+          if (cached) { setProfile(cached as Profile); setLoadError(''); return; }
+        } catch { /* No locally verified mobilizer profile. */ }
+      }
+      setLoadError(error.message);
+    }
     else if (!data) setLoadError('Your profile is not available. Contact an administrator.');
     else {
       let homeWardName: string | undefined;
@@ -100,7 +116,15 @@ function AuthenticatedApp() {
         const { data: ward } = await supabase.from('wards').select('name').eq('id', data.home_ward_id).maybeSingle();
         homeWardName = ward?.name;
       }
-      setProfile({ ...data, home_ward_name: homeWardName } as Profile);
+      const nextProfile = { ...data, home_ward_name: homeWardName } as Profile;
+      setProfile(nextProfile);
+      if (nextProfile.role === 'mobilizer' && nextProfile.status === 'approved') {
+        void cacheMobilizerProfile({
+          id: nextProfile.id, email: nextProfile.email || null, full_name: nextProfile.full_name,
+          phone_e164: nextProfile.phone_e164 || null, national_id_masked: null, role: 'mobilizer', status: 'approved',
+          home_ward_id: nextProfile.home_ward_id || null, home_ward_name: homeWardName, referral_code: nextProfile.referral_code || null,
+        }).catch(() => undefined);
+      }
       setLoadError('');
     }
   }, []);
@@ -212,10 +236,14 @@ function AuthenticatedApp() {
 function App() {
   const path=window.location.pathname;
   const joinMatch=path.match(/^\/join\/([^/]+)\/?$/);
-  if(joinMatch)return <JoinPage referralCode={decodeURIComponent(joinMatch[1])}/>;
-  if(path==='/privacy'||path==='/privacy-notice')return <PrivacyNoticePage/>;
-  if(path==='/data-subject-request')return <DataSubjectRequestPage/>;
-  return <AuthenticatedApp/>;
+  let page = <AuthenticatedApp/>;
+  if (joinMatch) {
+    let code = joinMatch[1];
+    try { code = decodeURIComponent(code); } catch { code = ''; }
+    page = <JoinPage referralCode={code}/>;
+  } else if(path==='/privacy'||path==='/privacy-notice') page = <PrivacyNoticePage/>;
+  else if(path==='/data-subject-request') page = <DataSubjectRequestPage/>;
+  return <Suspense fallback={<PageLoading/>}>{page}</Suspense>;
 }
 
 export default App;

@@ -176,7 +176,7 @@ export function DashboardView({ profile, compact = false }: { profile: Profile; 
       <label className="text-xs font-medium text-slate-600">Source<select value={filters.source} onChange={(e) => setFilters({ ...filters, source: e.target.value })} className="mt-1 block w-full rounded border p-2"><option value="">All sources</option>{['legacy', 'mobilizer', 'self_registered'].map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></label>
       <button className="self-end rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Apply filters</button>
     </form>
-    {loading && <p className="rounded bg-white p-3 text-sm text-slate-500">Loading dashboard…</p>}
+    {loading && !data && <div role="status" aria-label="Loading dashboard" className="grid animate-pulse gap-3 lg:grid-cols-2">{[0,1,2,3].map((item)=><div key={item} className="h-40 rounded-xl bg-white" />)}</div>}
     {error && <p role="alert" className="rounded bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     {data && <div className="grid gap-3 lg:grid-cols-2">
       <DashboardPanel title="Totals by ward" panelKey="wards" rows={data.wards} filters={appliedFilters} role={profile.role} />
