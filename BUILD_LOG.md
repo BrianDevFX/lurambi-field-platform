@@ -18,7 +18,7 @@ Branch: `build/phase-0`, created from `simplify` at `439f2d1`. Git history was r
 
 ### Historical purge
 
-After approval, `git-filter-repo` 2.47.0 was installed in a temporary workspace folder and run locally. It removed these complete file paths from all local refs, repacked/cleaned the repository, and removed the `origin` remote automatically. The sanitized Phase 0 files were then restored from a backup outside the repository and will be recommitted in this follow-up commit. No remote push was performed. `git log --all --full-history --name-only` reports no remaining history paths for the three files.
+After approval, `git-filter-repo` 2.47.0 was installed in a temporary workspace folder and run locally. It removed these complete file paths from all local refs, repacked/cleaned the repository, and removed the `origin` remote automatically. The sanitized Phase 0 files were then restored from a backup outside the repository and recommitted. A targeted history check now shows those paths only in this post-purge commit; the earlier file versions are absent from local refs. No remote push was performed.
 
 The equivalent filter command was:
 
