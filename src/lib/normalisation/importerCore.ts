@@ -4,8 +4,7 @@ import { normaliseNationalId } from './nationalId.ts';
 import { matchWard } from './wardMatcher.ts';
 import { matchPollingPlace } from './placeMatcher.ts';
 import { normaliseSupportLevel } from './supportLevel.ts';
-import { LegacyWorkbookRow } from '../synthetic/legacyWorkbookData.ts';
-import { Entry, NetworkContact, VerificationStatus } from '../../types/index.ts';
+import { Entry, LegacyWorkbookRow, NetworkContact, VerificationStatus } from '../../types/index.ts';
 
 export interface ProcessedImportRow {
   rowId: string;

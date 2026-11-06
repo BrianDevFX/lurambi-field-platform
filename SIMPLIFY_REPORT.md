@@ -117,6 +117,7 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 4. **PWA/offline queue:** IndexedDB helpers exist, but no service worker/manifest or server synchronization path was found. Do not describe it as working offline sync.
 5. **Vite setup:** although Vite-specific leftovers are prohibited by the task, Vite currently is the only build system. Removing it would break `npm run build`; migration to Next.js is unresolved.
 6. **Hard-coded hierarchy data:** `src/data/canonicalData.ts` feeds core matchers and capture/dashboard/admin screens. Remove only after database-backed replacements exist; otherwise core workflows would be weakened.
+7. **Import persistence and fixed success screen:** the import wizard computes a local dry run, then simulates progress and displays a hard-coded successful database receipt. There is no database client or commit API in this repository. It remains a known core-flow defect pending the intended backend.
 
 ## Removed files
 
@@ -125,6 +126,12 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 - `src/components/DataHierarchyView.tsx` — hard-coded ward/centre/station seed panel.
 - `src/components/docs/DocumentationView.tsx` — in-app setup, README, compliance, and test-plan viewer.
 - Five hard-coded synthetic/demo entries were removed from `src/App.tsx`; the app now starts with an empty in-memory list instead of fabricated voter records.
+- `src/components/analytics/ProjectionModelCard.tsx` — excluded turnout/victory projection model.
+- `src/lib/synthetic/legacyWorkbookData.ts` — removed the fake workbook generator; the workbook row type now lives in `src/types/index.ts`.
+- Import UI no longer loads a generated synthetic workbook.
+- `src/components/referral/ReferralView.tsx` no longer renders the fabricated mobilizer leaderboard.
+
+Cleanup group verification: `npm run lint` passed. `npm run build` passed (run with elevated permission after Tailwind's native binding hit sandbox `EPERM`); Vite reports a 1.71 MB minified main JS chunk.
 
 ## Removed dependencies and size
 

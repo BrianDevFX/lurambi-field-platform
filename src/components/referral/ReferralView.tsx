@@ -6,7 +6,6 @@ import {
   Copy, 
   Check, 
   ExternalLink, 
-  Trophy, 
   Users, 
   Sparkles, 
   CheckCircle2, 
@@ -115,15 +114,6 @@ export const ReferralView: React.FC<ReferralViewProps> = ({
     setJoinSubmitted(true);
   };
 
-  // Simulated leaderboard excluding legacy_import
-  const leaderboard = [
-    { rank: 1, name: 'Zainab (Sheywe)', referrals: 48, idRate: '88%' },
-    { rank: 2, name: 'Mildred (Mahiakalo)', referrals: 42, idRate: '81%' },
-    { rank: 3, name: `${mobilizerName} (You)`, referrals: 29, idRate: '84%' },
-    { rank: 4, name: 'Erick (Shirere)', referrals: 26, idRate: '75%' },
-    { rank: 5, name: 'Cornelius (Butsotso East)', referrals: 19, idRate: '69%' }
-  ];
-
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -160,7 +150,7 @@ export const ReferralView: React.FC<ReferralViewProps> = ({
       </div>
 
       {/* Sharing Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* WhatsApp Share Card */}
         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
@@ -238,38 +228,6 @@ export const ReferralView: React.FC<ReferralViewProps> = ({
           </div>
         </div>
 
-        {/* Leaderboard Card */}
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-1 border-b border-gray-100">
-            <h4 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-amber-500" />
-              Mobilizer Leaderboard
-            </h4>
-            <span className="text-[10px] text-gray-500 font-semibold">Excludes Legacy</span>
-          </div>
-
-          <div className="space-y-1.5 text-xs">
-            {leaderboard.map(item => (
-              <div
-                key={item.rank}
-                className={`flex items-center justify-between p-1.5 rounded-lg ${
-                  item.name.includes('(You)') ? 'bg-emerald-50 font-bold text-emerald-950 border border-emerald-200' : 'text-gray-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${item.rank <= 3 ? 'bg-amber-100 text-amber-900' : 'bg-gray-100 text-gray-600'}`}>
-                    {item.rank}
-                  </span>
-                  <span className="truncate max-w-[120px]">{item.name}</span>
-                </div>
-                <div className="flex items-center gap-3 font-mono text-[11px]">
-                  <span>{item.referrals} voters</span>
-                  <span className="text-gray-500">{item.idRate} ID</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Public Landing Page Simulator Modal */}

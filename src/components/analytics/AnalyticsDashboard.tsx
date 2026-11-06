@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import { CANONICAL_WARDS, CANONICAL_CENTRES, CANONICAL_STATIONS } from '../../data/canonicalData.ts';
 import { Entry } from '../../types/index.ts';
-import { ProjectionModelCard } from './ProjectionModelCard.tsx';
 import { exportSupportersXlsx, downloadCleanImportTemplate } from '../../lib/reports/excelExport.ts';
 import { generateCampaignPdfReport } from '../../lib/reports/pdfGenerator.ts';
 
@@ -400,8 +399,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ entries 
         </div>
       </div>
 
-      {/* Transparent Victory Projection Model */}
-      <ProjectionModelCard entries={entries} />
     </div>
   );
 };

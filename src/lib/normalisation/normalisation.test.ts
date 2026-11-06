@@ -3,8 +3,6 @@ import { normaliseNationalId } from './nationalId.ts';
 import { matchWard } from './wardMatcher.ts';
 import { matchPollingPlace } from './placeMatcher.ts';
 import { normaliseSupportLevel } from './supportLevel.ts';
-import { generateSyntheticLegacyWorkbook } from '../synthetic/legacyWorkbookData.ts';
-import { processWorkbookData } from './importerCore.ts';
 
 export interface TestResultItem {
   name: string;
@@ -136,44 +134,6 @@ export function runAllNormalisationUnitTests(): {
   // Misused column containing first name "Mildred"
   const sl3 = normaliseSupportLevel('Mildred');
   assert('Support Level', 'First name "Mildred" mapped to legacy_mobilizer_label', sl3.legacyMobilizerLabel === 'Mildred' && sl3.isMisusedColumn, 'legacyMobilizerLabel=Mildred', `label=${sl3.legacyMobilizerLabel}`);
-
-  // ==========================================
-  // 6. Importer Core on Full Synthetic Dataset
-  // ==========================================
-  const syntheticWorkbook = generateSyntheticLegacyWorkbook();
-  const processResult = processWorkbookData(syntheticWorkbook);
-
-  assert(
-    'Importer Core',
-    'Processes synthetic workbook containing >100 records',
-    processResult.report.totalRowsProcessed > 100,
-    '>100 rows',
-    `${processResult.report.totalRowsProcessed} rows`
-  );
-
-  assert(
-    'Importer Core',
-    'Separates faith leaders into pastors table (~10 records)',
-    processResult.pastors.length === 10,
-    '10 pastors',
-    `${processResult.pastors.length} pastors`
-  );
-
-  assert(
-    'Importer Core',
-    'Separates Community Health Promoters with public service neutrality protection',
-    processResult.chps.length === 10 && processResult.chps.every(c => c.exclude_from_campaign_exports),
-    '10 CHPs with exclude=true',
-    `${processResult.chps.length} CHPs`
-  );
-
-  assert(
-    'Importer Core',
-    'Merges cross-tab duplicate (Kennedy Musundi) and retains earliest capture date',
-    processResult.report.crossTabDuplicatesMergedCount >= 1,
-    'Merged duplicate >= 1',
-    `${processResult.report.crossTabDuplicatesMergedCount} merged`
-  );
 
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;

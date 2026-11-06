@@ -7,18 +7,14 @@ import {
   ArrowRight, 
   RefreshCw, 
   Download, 
-  Play, 
-  Layers, 
+  Play,
   Users, 
   Phone, 
-  ShieldCheck, 
   FileText,
   Sparkles,
-  ChevronRight,
-  Database
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { generateSyntheticLegacyWorkbook, LegacyWorkbookRow } from '../../lib/synthetic/legacyWorkbookData.ts';
+import { LegacyWorkbookRow } from '../../types/index.ts';
 import { 
   processWorkbookData, 
   generateImportReportXlsx, 
@@ -51,15 +47,6 @@ export const ImportWizard: React.FC = () => {
     failed: number;
     results: TestResultItem[];
   } | null>(() => runAllNormalisationUnitTests());
-
-  // Handle loading synthetic test workbook
-  const handleLoadSynthetic = () => {
-    const data = generateSyntheticLegacyWorkbook();
-    setWorkbookData(data);
-    setFileName('Synthetic_Lurambi_Legacy_Supporters_2024.xlsx');
-    setSelectedSheets(Object.keys(data));
-    setStep(2);
-  };
 
   // Handle user uploaded file via SheetJS
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,38 +243,12 @@ export const ImportWizard: React.FC = () => {
                   Select Legacy Supporter Workbook (.xlsx, .csv)
                 </h4>
                 <p className="text-xs text-gray-600">
-                  Upload the campaign's 1,000-supporter Excel sheet or test immediately using the synthetic dataset with all edge cases.
+                  Upload an Excel or CSV workbook to preview and clean its records.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                {/* 1-Click Synthetic Button */}
-                <button
-                  onClick={handleLoadSynthetic}
-                  className="p-5 rounded-xl border-2 border-emerald-600/60 bg-emerald-50/50 hover:bg-emerald-50 text-left transition-all flex flex-col justify-between group cursor-pointer shadow-xs"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900">
-                        RECOMMENDED FOR TEST
-                      </span>
-                      <Sparkles className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-                    </div>
-                    <h5 className="font-bold text-sm text-gray-900 mt-3">
-                      Load Synthetic Lurambi Workbook
-                    </h5>
-                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                      Preloaded with ~200 realistic rows: missing IDs, lost zero phones, ward typos ("Shieywe", "Mahialako"), junk places ("Daisy", "Approved"), and 10 Pastors + 10 CHPs.
-                    </p>
-                  </div>
-                  <div className="mt-4 flex items-center gap-1 text-xs font-bold text-emerald-800">
-                    <span>Load & Proceed</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </button>
-
-                {/* Upload Real File */}
-                <label className="p-5 rounded-xl border-2 border-dashed border-gray-300 hover:border-emerald-600 text-left transition-all flex flex-col justify-between cursor-pointer group bg-gray-50/50 hover:bg-white">
+              <div className="max-w-2xl mx-auto">
+                <label className="block p-5 rounded-xl border-2 border-dashed border-gray-300 hover:border-emerald-600 text-left cursor-pointer bg-gray-50/50 hover:bg-white">
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-200 text-gray-700">

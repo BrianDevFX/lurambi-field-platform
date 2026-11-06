@@ -21,6 +21,23 @@ export type EntrySource = 'legacy' | 'mobilizer' | 'self_registered';
 export type NetworkContactType = 'pastor' | 'chp' | 'other';
 export type ReachStatus = 'not_contacted' | 'contacted' | 'meeting_held';
 
+export interface LegacyWorkbookRow {
+  sheetName: string;
+  rowNumber: number;
+  date?: string;
+  name: string;
+  idNo?: string | number;
+  phone?: string | number;
+  pollingPlace?: string;
+  ward?: string;
+  supportLevel?: string;
+  eventContact?: string;
+  age?: string | number;
+  denomination?: string;
+  communityUnit?: string;
+  subCounty?: string;
+}
+
 export interface Ward {
   id: string;
   name: string;
