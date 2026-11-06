@@ -204,3 +204,42 @@ Branch: `build/phase-4`, created from `build/phase-3`. Phase commits: `f3a4bfc` 
 - With synthetic accounts, verify admin edit/reassign/merge/delete protections and audit entries; coordinator read-only ward scoping; manual verification on/off; bulk ID upload results; alias/place CRUD; and export row counts under each role.
 - Export synthetic cells beginning with `=`, `+`, `-`, `@`, tab and carriage return to XLSX, CSV and PDF, and confirm no formula executes in spreadsheet software. Confirm each export appears in `exports_log` and mobilizer/coordinator data stays within RLS scope.
 - Run the RLS integration suite and deployed-preview smoke checks before using real records. No push, merge, or production database access has occurred.
+
+## Phase 5 — Public join and privacy
+
+Branch: `build/phase-5`, created from `build/phase-4`. No push, merge, or production database access occurred.
+
+### Changes
+
+- Added the public `/join/:code` supporter form, `/privacy` notice, and `/data-subject-request` form. The public join page has English/Kiswahili labels, DB-backed ward/centre/station choices and consent wording, explicit consent, a honeypot, and Cloudflare Turnstile.
+- Added Vercel `/api/join` and `/api/dsr` handlers. They validate same-origin requests and input with Zod, check request size and honeypots, verify Turnstile server-side, apply DB-backed rate limits, and use only server-side service-role access. Join responses are generic and do not expose duplicate/existing-record details.
+- Added a migration for keyed-hash rate-limit subjects, service-role-only DSR submission, admin-audited DSR updates, and admin-audited legacy consent confirmation. National IDs are cleaned and hashed in the database; the DSR table stores no raw ID.
+- Added admin screens to review and action DSRs and to confirm legacy consent with supporter confirmation and an evidence note. Updated README for the current Phase 5 scope and environment configuration. Added `zod` as the API validation dependency.
+- Files changed: `api/join.ts`, `api/dsr.ts`, `server/public-api.ts`, `src/components/public/PublicPages.tsx`, `src/components/admin/PrivacyOperationsView.tsx`, `src/components/admin/AdminOperationsView.tsx`, `src/App.tsx`, `supabase/migrations/20261106170000_phase5_public_privacy.sql`, `package.json`, `package-lock.json`, `README.md`, `BUILD_LOG.md`.
+
+### Checks
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
+| `npm test` | PASS — 20 passed; 10 RLS integration tests skipped because no isolated database credentials/runtime are available. |
+| `npm run build` | PASS — Vite production build completed. Main JS 587.57 KB minified / 160.67 KB gzip; XLSX 491.99 KB / 160.33 KB gzip; jsPDF 399.67 KB / 129.90 KB gzip. Vite warns that main and XLSX chunks exceed 500 KB minified. |
+| `git diff --check` | PASS — no whitespace errors; Git reports configured LF-to-CRLF conversion warnings. |
+| Migration replay, Turnstile/API flows, consent enforcement, DSR queue, legacy consent audit | NOT VERIFIED — no local Supabase CLI/runtime or `.env.test` project was available; no database was contacted. |
+
+### Known gaps
+
+- Public forms require a valid enabled `settings.consent_policy`, Supabase server variables, and Cloudflare Turnstile keys. These were not configured or runtime-tested.
+- The deployed Vercel preview, rate-limit thresholds, bot rejection, public attribution, DSR admin workflow, duplicate privacy behavior, and legacy consent audit event still need synthetic end-to-end verification against local or dedicated TEST Supabase.
+- A successful public join maps the optional pledge checkbox to `strong_supporter` and an unchecked pledge to `not_assessed`; the current schema has no separate pledge column.
+- `npm test` did not run its ten database-backed RLS cases; phase code type-check/build and existing unit tests pass.
+- Main bundle remains above the 500 KB warning threshold; route-level and heavy-library splitting are scheduled for Phase 7.
+- Pre-existing untracked `PROGRESS_AUDIT.md` and `audit/` were not modified or staged.
+
+## HUMAN STEPS
+
+- Configure the six variables documented in `.env.example` in local/preview environments, with the service-role key and Turnstile secret restricted to Vercel server functions. Configure Turnstile allowed hostnames and a matching site key.
+- Apply `supabase/migrations/20261106170000_phase5_public_privacy.sql` only after the prior migrations, using local Supabase or the dedicated TEST project. Ensure `settings.consent_policy` has approved English wording, version, `enabled: true`, and optional `text_sw`. Do not use a production database for verification.
+- With synthetic accounts and data, test `/join/<referral_code>` on a phone viewport: valid attribution, optional ID, required consent, invalid/duplicate referral behavior, duplicate privacy, Turnstile rejection, honeypot handling, and rate limits. Check resulting entry flags and masked IDs in the admin UI.
+- Submit access, correction, and deletion requests with synthetic details; verify rate limiting and admin status/reason updates appear in `audit_log`. Confirm legacy consent only after direct supporter confirmation and verify its audit event.
+- Run the skipped RLS tests and review the deployed preview headers before loading any real records. No push, merge, or production DB access has occurred.

@@ -1,6 +1,6 @@
 # Lurambi Campaign Field Platform
 
-Vite + React + TypeScript single-page application backed by Supabase Auth and database RPCs. Phase 2 adds login, mobilizer registration and approval, and persisted mobilizer capture/list/link flows. The remaining import, public join, admin operations, and dashboard screens are not complete; do not collect real supporter data yet.
+Vite + React + TypeScript single-page application backed by Supabase Auth and database RPCs. The app includes mobilizer login, registration and approval, persisted capture/list/referral flows, imports, admin operations, exports, public supporter registration, a Privacy Notice, and a data-subject request form. Database and deployed-runtime behavior still need verification in an isolated environment; do not use real supporter data until those checks pass.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The app reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env.local`. `VITE_TURNSTILE_SITE_KEY` is reserved for the future public forms. Server-only variables for those Vercel functions are `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `TURNSTILE_SECRET_KEY`. The browser only uses the URL and anon key; never put server-only values in a `VITE_*` variable or commit a populated environment file.
+The browser reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_TURNSTILE_SITE_KEY` from `.env.local`. Vercel API functions use `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `TURNSTILE_SECRET_KEY` server-side. The browser only uses the URL, anon key, and Turnstile site key; never put server-only values in a `VITE_*` variable or commit a populated environment file. Configure the matching Cloudflare Turnstile site and secret keys for local/preview hostnames.
 
 ## Local Supabase database
 
@@ -40,7 +40,7 @@ npm run build
 
 `npm test` includes normalization unit tests and optional RLS integration tests. The latter run only when `.env.test` contains credentials and fixture IDs for an isolated local or TEST Supabase project. Never point them at production. RLS inventory queries are in `supabase/checks/rls_report.sql`.
 
-Vercel serves the Vite SPA from `dist/`; `vercel.json` rewrites browser routes to `index.html` and sets security headers. Public `/api` functions will be added in a later phase for join and data-subject requests.
+Vercel serves the Vite SPA from `dist/`; `vercel.json` rewrites browser routes to `index.html` and sets security headers. `/api/join` serves the public referral form and `/api/dsr` accepts data-subject requests. Both require server-only Supabase and Turnstile configuration and use database-backed rate limits. Configure all six variables in Vercel with the correct browser/server scopes.
 
 ## Data handling and compliance
 
@@ -52,4 +52,4 @@ Vercel serves the Vite SPA from `dist/`; `vercel.json` rewrites browser routes t
 
 ## Phase status
 
-Phase 1 establishes the schema, RLS, audit protection, ID protection, and core SECURITY DEFINER RPCs. Phase 2 connects Auth, role routing, mobilizer capture/search/list/referral, and mobilizer approval to Supabase. Admin flag review, verification, imports/exports, public forms, and analytics remain for later phases. Database migrations and role flows still need runtime verification against a local or dedicated TEST Supabase project before real supporter data is used.
+Phases 1–5 add the schema/RLS and protected RPCs, authenticated role flows, import operations, admin review and exports, and public join/privacy/DSR workflows. Analytics and offline/performance hardening remain for later phases. Migrations, RLS, role flows, imports, public forms, rate limits, Turnstile, and audit behavior still need runtime verification against a local or dedicated TEST Supabase project before real supporter data is used. For public forms, set `settings.consent_policy` to an enabled policy with a version and consent text; optional `text_sw` provides the Kiswahili text.
