@@ -4,6 +4,7 @@ import { CaptureWizard } from '../capture/CaptureWizard.tsx';
 import { ReferralView } from '../referral/ReferralView.tsx';
 import { supabase } from '../../lib/supabase/client.ts';
 import { ExportCenter } from '../admin/ExportCenter.tsx';
+import { DashboardView } from '../dashboard/DashboardView.tsx';
 import { Entry, Profile } from '../../types/index.ts';
 
 type Tab = 'capture' | 'list' | 'link' | 'profile';
@@ -97,6 +98,7 @@ export function MobilizerDashboard({ profile, onSignOut }: MobilizerDashboardPro
         <div className="flex justify-between gap-3 py-3"><dt className="text-slate-500">Referral code</dt><dd className="text-right font-mono font-semibold text-slate-900">{profile.referral_code || '—'}</dd></div>
       </dl>
       <button onClick={onSignOut} className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Sign out</button>
+      <div className="mt-6 border-t border-slate-100 pt-5"><DashboardView profile={profile} compact /></div>
     </section>}
 
     <nav aria-label="Mobilizer navigation" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-slate-200 bg-white px-1 pb-2 pt-1 shadow-[0_-4px_14px_rgba(15,23,42,0.08)]">
