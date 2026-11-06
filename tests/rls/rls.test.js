@@ -6,8 +6,9 @@ import { randomUUID } from 'node:crypto'
 // Optional disposable TEST project fixtures. Required: TEST_SUPABASE_URL,
 // TEST_SUPABASE_ANON_KEY, TEST_*_EMAIL/PASSWORD for all five roles,
 // TEST_WARD_ID, TEST_CENTRE_ID, TEST_CONSENT_VERSION, TEST_ENTRY_A_ID,
-// TEST_ENTRY_B_ID, TEST_ENTRY_OTHER_WARD_ID, and TEST_AUDIT_ID. Values are
-// read locally and never logged. Do not point this suite at production.
+// TEST_ENTRY_B_ID, TEST_ENTRY_OTHER_WARD_ID, TEST_AUDIT_ID, and
+// TEST_MOBILIZER_B_ID. Values are read locally and never logged. Do not point
+// this suite at production.
 try {
   const envFile = readFileSync('.env.test', 'utf8')
   for (const line of envFile.split(/\r?\n/)) {
@@ -29,7 +30,7 @@ const roles = ['ADMIN', 'COORDINATOR', 'MOBILIZER_A', 'MOBILIZER_B', 'PENDING']
 const credentials = Object.fromEntries(roles.map((role) => [role, {
   email: env[`TEST_${role}_EMAIL`], password: env[`TEST_${role}_PASSWORD`],
 }]))
-const fixtureIds = ['TEST_ENTRY_A_ID', 'TEST_ENTRY_B_ID', 'TEST_ENTRY_OTHER_WARD_ID', 'TEST_AUDIT_ID']
+const fixtureIds = ['TEST_ENTRY_A_ID', 'TEST_ENTRY_B_ID', 'TEST_ENTRY_OTHER_WARD_ID', 'TEST_AUDIT_ID', 'TEST_MOBILIZER_B_ID']
 const configured = Boolean(url && anonKey && wardId && centreId && env.TEST_CONSENT_VERSION
   && fixtureIds.every((key) => env[key]) && roles.every((role) =>
   credentials[role].email && credentials[role].password))
@@ -132,8 +133,12 @@ describe.skipIf(!configured)('RLS and security RPC integration (isolated TEST da
     })
     expect(repeated.error).toBeNull()
     expect(repeated.data?.blocked).toBe(true)
+    const attempts = await clients.ADMIN.from('duplicate_attempts').select('id')
+      .eq('attempted_name', 'Synthetic Duplicate Fixture Beta')
+    expect(attempts.error).toBeNull()
+    expect(attempts.data?.length).toBeGreaterThan(0)
     const sharedPhone = await submit(clients.MOBILIZER_A, {
-      name: `Synthetic Shared Phone ${randomUUID().slice(0, 8)}`, phone: '712345671',
+      name: `Unrelated Fixture ${randomUUID().slice(0, 8)}`, phone: '712345671',
     })
     expect(sharedPhone.error).toBeNull()
     expect(sharedPhone.data?.blocked).not.toBe(true)
@@ -196,5 +201,14 @@ describe.skipIf(!configured)('RLS and security RPC integration (isolated TEST da
     expect(second.error).toBeNull()
     expect(second.data?.imported).toBe(0)
     expect(second.data?.merged).toBe(1)
+  })
+
+  it('blocks a suspended mobilizer from submitting entries', async () => {
+    const { error: suspendError } = await clients.ADMIN.rpc('suspend_mobilizer', {
+      p_profile_id: env.TEST_MOBILIZER_B_ID, p_reason: 'Synthetic integration test suspension',
+    })
+    expect(suspendError).toBeNull()
+    const result = await submit(clients.MOBILIZER_B, { name: 'Synthetic Suspended Fixture' })
+    expect(result.error).toBeTruthy()
   })
 })

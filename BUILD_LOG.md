@@ -72,7 +72,7 @@ Branch: `build/phase-1`, created from the Phase 0 branch. No database was connec
 | Command | Result |
 |---|---|
 | `npm run lint` | PASS — `tsc --noEmit`, exit 0. |
-| `npm test` | PASS — 1 normalization file, 17 tests passed; 1 RLS integration file skipped, 9 tests skipped because no isolated TEST project/fixtures are configured. |
+| `npm test` | PASS — 1 normalization file, 17 tests passed; 1 RLS integration file skipped, 10 tests skipped because no isolated TEST project/fixtures are configured. |
 | `npm run build` | PASS — Vite production build completed. Existing large-chunk warning remains: main JS 1,679.19 KB minified / 514.88 KB gzip. |
 | `supabase db reset` / migration replay | NOT VERIFIED — Supabase CLI is not installed; no database credentials were available. No production connection was attempted. |
 | `git diff --check` | PASS — whitespace check clean; Git emitted only configured LF-to-CRLF notices. |
