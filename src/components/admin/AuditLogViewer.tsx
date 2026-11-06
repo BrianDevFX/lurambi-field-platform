@@ -23,62 +23,12 @@ export interface AuditLogEntry {
   newValues?: any;
 }
 
-const SAMPLE_AUDIT_LOGS: AuditLogEntry[] = [
-  {
-    id: 'aud-01',
-    userName: 'Hon. Campaign Director',
-    userRole: 'admin',
-    action: 'MERGE_ENTRIES',
-    entityType: 'entry',
-    entityId: 'ent-05',
-    reason: 'Merged duplicate Kennedy Musundi entries from Sheywe sheet into Raw Data master. Retained earliest capture date.',
-    timestamp: '2026-10-22 09:14:22 UTC',
-    oldValues: { duplicateStatus: 'unresolved' },
-    newValues: { merged: true, masterId: 'ent-02' }
-  },
-  {
-    id: 'aud-02',
-    userName: 'Hon. Campaign Director',
-    userRole: 'admin',
-    action: 'APPROVE_MOBILIZER',
-    entityType: 'profile',
-    entityId: 'usr-03',
-    reason: 'Vetted in person during Sheywe ward field briefing. Referral code LUR789 activated.',
-    timestamp: '2026-10-22 08:30:11 UTC',
-    newValues: { status: 'approved', referralCode: 'LUR789' }
-  },
-  {
-    id: 'aud-03',
-    userName: 'Barasa Coordinator (Sheywe)',
-    userRole: 'ward_coordinator',
-    action: 'VERIFY_SUPPORTER',
-    entityType: 'entry',
-    entityId: 'ent-01',
-    reason: 'Cross-checked with IEBC Lurambi polling station stream 1 physical register.',
-    timestamp: '2026-10-21 16:45:00 UTC',
-    oldValues: { verification_status: 'unverified' },
-    newValues: { verification_status: 'verified' }
-  },
-  {
-    id: 'aud-04',
-    userName: 'Hon. Campaign Director',
-    userRole: 'admin',
-    action: 'RESOLVE_FLAG',
-    entityType: 'entry',
-    entityId: 'ent-04',
-    reason: 'Confirmed shared phone is household family member (Mama Wekesa). Informational SHARED_PHONE flag dismissed.',
-    timestamp: '2026-10-21 14:10:05 UTC',
-    oldValues: { resolved: false },
-    newValues: { resolved: true }
-  }
-];
-
 interface AuditLogViewerProps {
   customLogs?: AuditLogEntry[];
 }
 
 export const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ customLogs = [] }) => {
-  const [logs, setLogs] = useState<AuditLogEntry[]>([...customLogs, ...SAMPLE_AUDIT_LOGS]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>(customLogs);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('all');
 

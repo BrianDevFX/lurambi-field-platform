@@ -23,8 +23,8 @@ interface ReferralViewProps {
 }
 
 export const ReferralView: React.FC<ReferralViewProps> = ({
-  referralCode = 'LUR789',
-  mobilizerName = 'Barasa Field Officer',
+  referralCode = '',
+  mobilizerName = '',
   entries,
   onSelfRegisterEntry
 }) => {

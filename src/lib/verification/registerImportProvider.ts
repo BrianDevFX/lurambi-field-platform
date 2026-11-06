@@ -13,61 +13,13 @@ export interface OfficialVoterRecord {
   voterNumber: string;
 }
 
-// Sample official voter register extract loaded for Lurambi demonstration
-export const SAMPLE_IEBC_REGISTER: OfficialVoterRecord[] = [
-  {
-    id: 'reg-01',
-    nationalIdHash: '28491023_hash',
-    fullName: 'BARASA WEKESA SYNTHETIC',
-    constituency: 'Lurambi',
-    wardId: 'a0000001-0000-0000-0000-000000000001',
-    wardName: 'Sheywe',
-    pollingCentreId: 'b0000001-0000-0000-0000-000000000001',
-    pollingCentreName: 'Kakamega Primary School',
-    voterNumber: 'IEBC-LUR-2022-09481'
-  },
-  {
-    id: 'reg-02',
-    nationalIdHash: '31204958_hash',
-    fullName: 'OMONDI OTIENO FICTIONAL',
-    constituency: 'Lurambi',
-    wardId: 'a0000001-0000-0000-0000-000000000003',
-    wardName: 'Mahiakalo',
-    pollingCentreId: 'b0000003-0000-0000-0000-000000000002',
-    pollingCentreName: 'MMUST (Masinde Muliro University)',
-    voterNumber: 'IEBC-LUR-2022-11029'
-  },
-  {
-    id: 'reg-03',
-    nationalIdHash: '27182930_hash',
-    fullName: 'KENNEDY MUSUNDI TEST',
-    constituency: 'Lurambi',
-    wardId: 'a0000001-0000-0000-0000-000000000001',
-    wardName: 'Sheywe',
-    pollingCentreId: 'b0000001-0000-0000-0000-000000000001',
-    pollingCentreName: 'Kakamega Primary School',
-    voterNumber: 'IEBC-LUR-2022-04820'
-  },
-  {
-    id: 'reg-04',
-    nationalIdHash: '33445566_hash',
-    fullName: 'MERCYLINE AMBANI DEMO',
-    constituency: 'Shinyalu', // Registered in neighboring Shinyalu!
-    wardId: 'ext-shinyalu-01',
-    wardName: 'Isukha East',
-    pollingCentreId: 'ext-shinyalu-pc-01',
-    pollingCentreName: 'Shinyalu Primary School',
-    voterNumber: 'IEBC-SHI-2022-88201'
-  }
-];
-
 export class RegisterImportProvider implements VerificationProvider {
   id = 'register_import' as const;
   name = 'Register Import Matcher (IEBC Extract)';
   description = 'Matches supporter records against the internal voter_register table populated by authorized IEBC extracts.';
   isEnabled = true;
 
-  private records: OfficialVoterRecord[] = SAMPLE_IEBC_REGISTER;
+  private records: OfficialVoterRecord[] = [];
 
   constructor(customRegister?: OfficialVoterRecord[]) {
     if (customRegister) {

@@ -1,4 +1,4 @@
-import { Ward, PollingCentre, PollingStation, PlaceAlias, NetworkContact } from '../types/index.ts';
+import { Ward, PollingCentre, PollingStation, PlaceAlias } from '../types/index.ts';
 
 export const CANONICAL_WARDS: Ward[] = [
   { id: 'a0000001-0000-0000-0000-000000000001', name: 'Sheywe', code: 'LUR-01', constituency_name: 'Lurambi', county_name: 'Kakamega', registered_voters_target: 26500 },
@@ -8,7 +8,6 @@ export const CANONICAL_WARDS: Ward[] = [
   { id: 'a0000001-0000-0000-0000-000000000005', name: 'Butsotso South', code: 'LUR-05', constituency_name: 'Lurambi', county_name: 'Kakamega', registered_voters_target: 16900 },
   { id: 'a0000001-0000-0000-0000-000000000006', name: 'Butsotso Central', code: 'LUR-06', constituency_name: 'Lurambi', county_name: 'Kakamega', registered_voters_target: 18500 }
 ];
-
 export const CANONICAL_CENTRES: PollingCentre[] = [
   { id: 'b0000001-0000-0000-0000-000000000001', ward_id: 'a0000001-0000-0000-0000-000000000001', name: 'Kakamega Primary School', code: 'PC-SHEY-01', total_registered_voters: 3450 },
   { id: 'b0000001-0000-0000-0000-000000000002', ward_id: 'a0000001-0000-0000-0000-000000000001', name: 'Bukhungu Stadium Grounds', code: 'PC-SHEY-02', total_registered_voters: 2800 },
@@ -47,17 +46,3 @@ export const CANONICAL_ALIASES: PlaceAlias[] = [
   { id: '9', raw_alias: 'Approved', canonical_type: 'polling_centre', confidence: 0.0, notes: 'Status string in place column -> Needs Mapping' }
 ];
 
-export const INITIAL_PASTORS: NetworkContact[] = [
-  { id: 'p1', type: 'pastor', name: 'Rev. Timothy Wangila', phone_e164: '+254710111222', denomination: 'PEFA Kakamega Central', ward_id: 'a0000001-0000-0000-0000-000000000001', ward_name: 'Sheywe', reach_status: 'meeting_held', notes: 'Met during Sheywe leaders breakfast. Key faith opinion shaper.', sub_county: 'Lurambi', exclude_from_campaign_exports: false },
-  { id: 'p2', type: 'pastor', name: 'Pastor Mary Makokha', phone_e164: '+254721333444', denomination: 'Friends Church (Quakers) Shirere', ward_id: 'a0000001-0000-0000-0000-000000000002', ward_name: 'Shirere', reach_status: 'contacted', notes: 'Advocates for women & youth vocational training.', sub_county: 'Lurambi', exclude_from_campaign_exports: false },
-  { id: 'p3', type: 'pastor', name: 'Bishop Geoffrey Shikuku', phone_e164: '+254733555666', denomination: 'NCCK Regional Fellowship', ward_id: 'a0000001-0000-0000-0000-000000000003', ward_name: 'Mahiakalo', reach_status: 'meeting_held', notes: 'Influential council convener across Western Kakamega.', sub_county: 'Lurambi', exclude_from_campaign_exports: false },
-  { id: 'p4', type: 'pastor', name: 'Fr. Aloysius Omondi', phone_e164: '+254701777888', denomination: 'Catholic Diocese of Kakamega', ward_id: 'a0000001-0000-0000-0000-000000000001', ward_name: 'Sheywe', reach_status: 'contacted', notes: 'Parish community council discussions.', sub_county: 'Lurambi', exclude_from_campaign_exports: false },
-  { id: 'p5', type: 'pastor', name: 'Pastor Nathan Barasa', phone_e164: '+254712999000', denomination: 'ACK St. Luke Butsotso East', ward_id: 'a0000001-0000-0000-0000-000000000004', ward_name: 'Butsotso East', reach_status: 'not_contacted', notes: 'Initial outreach requested.', sub_county: 'Lurambi', exclude_from_campaign_exports: false }
-];
-
-export const INITIAL_CHPS: NetworkContact[] = [
-  { id: 'c1', type: 'chp', name: 'Grace Nafuna Simiyu', phone_e164: '+254711223344', community_unit: 'Amalemba Community Unit', ward_id: 'a0000001-0000-0000-0000-000000000002', ward_name: 'Shirere', reach_status: 'contacted', notes: 'Household health promoter. Neutral engagement only.', sub_county: 'Lurambi', exclude_from_campaign_exports: true },
-  { id: 'c2', type: 'chp', name: 'Beatrice Imbuhila', phone_e164: '+254722334455', community_unit: 'Bukura Community Unit', ward_id: 'a0000001-0000-0000-0000-000000000005', ward_name: 'Butsotso South', reach_status: 'not_contacted', notes: 'Active in agricultural community health linkages.', sub_county: 'Lurambi', exclude_from_campaign_exports: true },
-  { id: 'c3', type: 'chp', name: 'Silvanus Mukolwe', phone_e164: '+254733445566', community_unit: 'Elukhambi Community Unit', ward_id: 'a0000001-0000-0000-0000-000000000006', ward_name: 'Butsotso Central', reach_status: 'contacted', notes: 'Highlighted feeder road transit during medical emergencies.', sub_county: 'Lurambi', exclude_from_campaign_exports: true },
-  { id: 'c4', type: 'chp', name: 'Roseline Khalayi', phone_e164: '+254705556677', community_unit: 'Emukaya Community Unit', ward_id: 'a0000001-0000-0000-0000-000000000004', ward_name: 'Butsotso East', reach_status: 'meeting_held', notes: 'Maternal health coordinator.', sub_county: 'Lurambi', exclude_from_campaign_exports: true }
-];

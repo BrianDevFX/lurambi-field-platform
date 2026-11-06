@@ -30,85 +30,12 @@ interface FlaggedRecord {
   isResolved: boolean;
 }
 
-const INITIAL_FLAGS: FlaggedRecord[] = [
-  {
-    id: 'flag-01',
-    entryId: 'ent-01',
-    supporterName: 'Nafuna Makokha Demo',
-    phone: '+254705961838',
-    maskedId: 'Pending ID',
-    wardName: 'Sheywe',
-    centreName: 'Bukhungu Stadium Grounds',
-    flagCode: 'MISSING_ID',
-    severity: 'warning',
-    details: 'Supporter captured without National ID number. Status is pending_id.',
-    capturedOn: '2024-03-12',
-    isResolved: false
-  },
-  {
-    id: 'flag-02',
-    entryId: 'ent-02',
-    supporterName: 'Collins Khisa Mock',
-    phone: '+254722445566',
-    maskedId: '29***481',
-    wardName: 'Butsotso Central',
-    centreName: 'Approved',
-    flagCode: 'UNMAPPED_PLACE',
-    severity: 'warning',
-    details: 'Polling place "Approved" is a junk status string. Requires canonical centre mapping.',
-    capturedOn: '2024-03-16',
-    isResolved: false
-  },
-  {
-    id: 'flag-03',
-    entryId: 'ent-03',
-    supporterName: 'Erick Mulama Test',
-    phone: '+25471234567',
-    maskedId: '29***756',
-    wardName: 'Shirere',
-    centreName: 'Amalemba Primary School',
-    flagCode: 'INVALID_PHONE',
-    severity: 'warning',
-    details: 'Phone number has 8 digits (+25471234567). Invalid Kenyan mobile length.',
-    capturedOn: '2024-03-15',
-    isResolved: false
-  },
-  {
-    id: 'flag-04',
-    entryId: 'ent-04',
-    supporterName: 'Silvia Wekesa Synthetic',
-    phone: '+254712345678',
-    maskedId: 'Pending ID',
-    wardName: 'Sheywe',
-    centreName: 'Kakamega Primary School',
-    flagCode: 'SHARED_PHONE',
-    severity: 'info',
-    details: 'Handset shared with Barasa Wekesa. Verified as household family member.',
-    capturedOn: '2024-03-15',
-    isResolved: false
-  },
-  {
-    id: 'flag-05',
-    entryId: 'ent-05',
-    supporterName: 'Kennedy Musundi Test',
-    phone: '+254720123456',
-    maskedId: '27***930',
-    wardName: 'Sheywe',
-    centreName: 'Kakamega Primary School',
-    flagCode: 'POSSIBLE_DUPLICATE',
-    severity: 'critical',
-    details: 'Appeared in both Raw Data and Sheywe ward sheet. Duplicate candidate for merge.',
-    capturedOn: '2024-02-10',
-    isResolved: false
-  }
-];
-
 interface FlagReviewQueueProps {
   onAuditAction: (action: string, entityId: string, reason: string, oldVal?: any, newVal?: any) => void;
 }
 
 export const FlagReviewQueue: React.FC<FlagReviewQueueProps> = ({ onAuditAction }) => {
-  const [flags, setFlags] = useState<FlaggedRecord[]>(INITIAL_FLAGS);
+  const [flags, setFlags] = useState<FlaggedRecord[]>([]);
   const [filterCode, setFilterCode] = useState<string>('all');
   const [selectedFlagForAction, setSelectedFlagForAction] = useState<FlaggedRecord | null>(null);
   const [actionType, setActionType] = useState<'resolve' | 'dismiss' | 'merge'>('resolve');

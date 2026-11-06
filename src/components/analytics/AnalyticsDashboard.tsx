@@ -130,11 +130,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ entries 
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-emerald-700" />
             <h3 className="font-bold text-base text-gray-900">
-              Stage 7: Campaign Intelligence & Analytics Dashboard
+              Dashboard
             </h3>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-              2027 Election Intelligence
-            </span>
           </div>
           <p className="mt-1 text-xs text-gray-600">
             Real-time coverage across 6 Lurambi wards, data completeness tracking, priority polling stations, and export reports.
@@ -280,7 +277,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ entries 
               <PieIcon className="w-4 h-4 text-emerald-700" />
               Support Level Commitment Funnel
             </h4>
-            <span className="text-[10px] text-gray-500 font-mono">Pledged Sentiment</span>
+            <span className="text-[10px] text-gray-500 font-mono">Support levels</span>
           </div>
 
           <div className="h-60 w-full flex items-center justify-center">

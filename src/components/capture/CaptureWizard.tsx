@@ -66,8 +66,6 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
   const [selectedStationId, setSelectedStationId] = useState('');
   const [supportLevel, setSupportLevel] = useState<SupportLevel>('strong_supporter');
   const [selectedIssues, setSelectedIssues] = useState<string[]>(['CDF Bursaries & Education', 'Clean Piped Water']);
-  const [needsTransport, setNeedsTransport] = useState(false);
-  const [hasPvc, setHasPvc] = useState(true);
   const [notes, setNotes] = useState('');
   const [consentAccepted, setConsentAccepted] = useState(false);
 
@@ -184,8 +182,8 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
       polling_station_name: station?.station_name || undefined,
       support_level: supportLevel,
       issues: selectedIssues,
-      needs_transport: needsTransport,
-      has_pvc: hasPvc,
+      needs_transport: false,
+      has_pvc: false,
       notes: notes.trim() || undefined,
       consent_at: new Date().toISOString(),
       consent_text_version: 'v1.2-2027',
@@ -502,29 +500,6 @@ export const CaptureWizard: React.FC<CaptureWizardProps> = ({
                   );
                 })}
               </div>
-            </div>
-
-            {/* Election Day Readiness Toggles */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <label className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer bg-gray-50/50">
-                <input
-                  type="checkbox"
-                  checked={needsTransport}
-                  onChange={e => setNeedsTransport(e.target.checked)}
-                  className="rounded text-emerald-600"
-                />
-                <span className="text-[11px] font-medium text-gray-800">Needs Election Transit</span>
-              </label>
-
-              <label className="p-2.5 rounded-xl border border-gray-200 flex items-center gap-2 cursor-pointer bg-gray-50/50">
-                <input
-                  type="checkbox"
-                  checked={hasPvc}
-                  onChange={e => setHasPvc(e.target.checked)}
-                  className="rounded text-emerald-600"
-                />
-                <span className="text-[11px] font-medium text-gray-800">Has PVC / ID in Hand</span>
-              </label>
             </div>
 
             {/* Mandatory Kenya Data Protection Act 2019 Consent */}

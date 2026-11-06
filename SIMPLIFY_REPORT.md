@@ -13,7 +13,7 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 | `architecture` — `ArchitectureView` | REMOVE | In-app architecture notes and folder tree are documentation. |
 | `supabase_sql` — `SqlSchemaView` | REMOVE | In-app schema/RLS viewer is setup documentation. SQL files remain untouched. |
 | `importer_wizard` — `ImportWizard` | KEEP | Import and legacy-data cleaning are required; remove only synthetic-data/demo controls. |
-| `verification_logic` — `VerificationLogicView` | KEEP | Verification and to-verify export are required; interactive parts need a human decision because they use local sample data. |
+| `verification_logic` — `VerificationLogicView` | KEEP | Verification and to-verify export are required; its queue has no database source in this checkout. |
 | `mobilizer_capture` — `MobilizerDashboard` | KEEP | Capture, list, referral, and offline entry points map to core workflows; implementation is currently simulated. |
 | `admin_panel` — `AdminDashboard` | KEEP | Flag review, approvals, contacts, mapping, and audit views map to core admin workflows; implementation is currently simulated. |
 | `analytics_dashboard` — `AnalyticsDashboard` | KEEP | Dashboard/export functionality is requested; projection and leaderboard extras are removable. Data source is currently in-memory. |
@@ -34,7 +34,7 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 | Stage 7: Analytics & Reports | Header | KEEP (rename Dashboard) | Keep requested dashboard essentials and exports; projection extras removable. |
 | Stage 8: Production Docs & KDPA | Header | REMOVE | Documentation viewer; functional compliance UI is not demonstrated in this app. |
 | 6 Wards & Seeds | Header | REMOVE | Hard-coded seed/place viewer. |
-| Simulate Role: Admin / Coordinator / Mobilizer | Header | NEEDS HUMAN DECISION | A client-side role switcher is not authentication and cannot safely represent the required roles. Do not treat it as access control. |
+| Simulate Role: Admin / Coordinator / Mobilizer | Header | REMOVE | Client-side role simulation was not authentication or access control. |
 | Flag Review Queue | AdminDashboard | KEEP | Required flag review queue; currently local demo state. |
 | User Approvals | AdminDashboard | KEEP | Mobilizer registration/approval is required; currently no backend is connected. |
 | Pastors & CHPs | AdminDashboard | KEEP | Network contacts are in requested scope; currently hard-coded local records. |
@@ -46,6 +46,11 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 | PWA Offline Queue | MobilizerDashboard | NEEDS HUMAN DECISION | IndexedDB queue exists locally, but no working server sync/PWA integration was found. |
 | Projection / turnout model | AnalyticsDashboard card | REMOVE | Explicitly excluded election projection model. |
 | Mobilizer leaderboard | ReferralView card | REMOVE | Explicitly excluded decorative leaderboard. |
+| 4-Step Import Wizard / Unit Tests | ImportWizard | KEEP / REMOVE | Retain the import workflow; removed the in-app unit-test viewer because it exposed developer test output in the app. |
+| Duplicate Detector Simulator | VerificationLogicView | REMOVE | Demo presets used fabricated data; duplicate detection remains in the capture flow. |
+| Verification Provider Hub | VerificationLogicView | KEEP | Manual and register-import verification are core; no database-backed entries/register exist in this checkout. |
+| Verification Queue | VerificationLogicView | KEEP | To-verify export is core; current queue has no connected data source. |
+| Pastors / CHPs | NetworkContactsManager | KEEP | Required network contacts; fabricated example contacts removed. |
 
 ### API routes
 
@@ -63,7 +68,7 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 | `src/components/DataHierarchyView.tsx` | REMOVE | Hard-coded ward/centre/station seed display. |
 | `src/components/docs/DocumentationView.tsx` | REMOVE | Setup, README, compliance, and test-plan viewer. |
 | `src/components/importer/ImportWizard.tsx` | KEEP / simplify | Required import wizard; remove synthetic workbook generator and embedded test/demo actions. |
-| `src/components/verification/VerificationLogicView.tsx` | KEEP / review | Required verification and export; sample records/provider simulator are not connected to a database. |
+| `src/components/verification/VerificationLogicView.tsx` | KEEP / review | Required verification and export; its queue has no database source in this checkout. |
 | `src/components/mobilizer/MobilizerDashboard.tsx` | KEEP / review | Required mobilizer navigation; current data is in-memory. |
 | `src/components/capture/CaptureWizard.tsx` | KEEP / review | Required capture and consent surface; currently local-only. |
 | `src/components/referral/ReferralView.tsx` | KEEP / simplify | Required QR/referral surface; remove leaderboard; public join is only a local preview and synthetic form submission. |
@@ -71,9 +76,9 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 | `src/components/admin/AdminDashboard.tsx` | KEEP / review | Required admin entry point; uses local state. |
 | `src/components/admin/FlagReviewQueue.tsx` | KEEP / review | Required flags; sample/local data only. |
 | `src/components/admin/NeedsMappingQueue.tsx` | KEEP / review | Required unmapped-place handling; sample/local data only. |
-| `src/components/admin/NetworkContactsManager.tsx` | KEEP / review | Required if working; currently uses hard-coded records. |
+| `src/components/admin/NetworkContactsManager.tsx` | KEEP / review | Required network contacts; seeded examples removed, but no database source is connected. |
 | `src/components/admin/UserManagementView.tsx` | KEEP / review | Required approval workflow; currently simulated. |
-| `src/components/admin/AuditLogViewer.tsx` | KEEP / review | Required audit trail; currently hard-coded records. |
+| `src/components/admin/AuditLogViewer.tsx` | KEEP / review | Required audit trail; seeded examples removed, but no database source is connected. |
 | `src/components/analytics/AnalyticsDashboard.tsx` | KEEP / simplify | Required dashboard; remove projection card and keep only requested metrics/filters/Excel export where implemented. |
 | `src/components/analytics/ProjectionModelCard.tsx` | REMOVE | Explicitly excluded projection model. |
 
@@ -118,6 +123,7 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 5. **Vite setup:** although Vite-specific leftovers are prohibited by the task, Vite currently is the only build system. Removing it would break `npm run build`; migration to Next.js is unresolved.
 6. **Hard-coded hierarchy data:** `src/data/canonicalData.ts` feeds core matchers and capture/dashboard/admin screens. Remove only after database-backed replacements exist; otherwise core workflows would be weakened.
 7. **Import persistence and fixed success screen:** the import wizard computes a local dry run, then simulates progress and displays a hard-coded successful database receipt. There is no database client or commit API in this repository. It remains a known core-flow defect pending the intended backend.
+8. **Offline queue sync:** its current “sync” only waits, deletes queued items, and adds them to in-memory state; no request reaches a server. The queue is retained for review and must not be represented as working sync.
 
 ## Removed files
 
@@ -130,6 +136,11 @@ There are no Next.js/React Router routes or URL-backed pages. The following sing
 - `src/lib/synthetic/legacyWorkbookData.ts` — removed the fake workbook generator; the workbook row type now lives in `src/types/index.ts`.
 - Import UI no longer loads a generated synthetic workbook.
 - `src/components/referral/ReferralView.tsx` no longer renders the fabricated mobilizer leaderboard.
+- Removed fabricated seed records from the mobilizer approval, flag, audit, network-contact, and voter-register views. Their initial lists are empty until a real data source is restored.
+- Removed the interactive duplicate-rule simulator from the verification screen; duplicate detection remains in the capture flow.
+- Removed the disabled external-link verification stub and its UI. Register-import and manual provider code remain.
+- `src/lib/verification/externalLinkStubProvider.ts` — disabled provider stub; no external verification requests were made or needed.
+- Removed the simulated role selector from the header; it did not authenticate or enforce role permissions.
 - `metadata.json` — unused AI Studio manifest.
 - `bun.lock` — duplicate lockfile for an unused package manager; npm's `package-lock.json` remains authoritative.
 - `vite.config.ts` — removed the AI Studio `DISABLE_HMR` branch and unused path alias; retained the Vite plugins needed by this repo.
@@ -142,6 +153,8 @@ Cleanup group verification: `npm run lint` passed. `npm run build` passed (run w
 Removed after import searches confirmed no source/config usage: `@google/genai` (11.62 MB), `dotenv` (0.10 MB), `express` (0.21 MB), `fuse.js` (0.40 MB), `motion` (0.65 MB), `zod` (5.86 MB), `@types/express` (0.01 MB), `autoprefixer` (0.20 MB), `tsx` (0.38 MB), and direct `esbuild` (0.14 MB). Direct installed package folders totaled approximately **19.57 MB** before removal. npm reported 138 package entries removed across uninstall commands; `npm prune` completed.
 
 Verification after this group: `npm run lint` passed; `npm run build` passed. Production main JS remains about 1.71 MB minified (523 KB gzip), so charting/export libraries still dominate the bundle.
+
+Final UI cleanup verification: `npm run lint` passed; `npm run build` passed with a 1.68 MB minified main JS chunk (515 KB gzip). Vite emitted only its large-chunk advisory.
 
 ## Smoke-test checklist
 

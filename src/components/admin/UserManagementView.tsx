@@ -14,71 +14,12 @@ import {
 import { CANONICAL_WARDS } from '../../data/canonicalData.ts';
 import { Profile, UserRole, UserStatus } from '../../types/index.ts';
 
-const SAMPLE_PROFILES: Profile[] = [
-  {
-    id: 'usr-01',
-    email: 'admin.lurambi@campaign.ke',
-    full_name: 'Hon. Campaign Director',
-    phone_e164: '+254710000001',
-    national_id_masked: '21***123',
-    role: 'admin',
-    status: 'approved',
-    home_ward_name: 'Sheywe',
-    referral_code: 'DIR001'
-  },
-  {
-    id: 'usr-02',
-    email: 'coord.sheywe@campaign.ke',
-    full_name: 'Barasa Coordinator (Sheywe)',
-    phone_e164: '+254720000002',
-    national_id_masked: '24***456',
-    role: 'ward_coordinator',
-    status: 'approved',
-    home_ward_id: 'a0000001-0000-0000-0000-000000000001',
-    home_ward_name: 'Sheywe',
-    referral_code: 'CRD002'
-  },
-  {
-    id: 'usr-03',
-    email: 'zainab.field@gmail.com',
-    full_name: 'Zainab Makokha',
-    phone_e164: '+254712345678',
-    national_id_masked: '28***023',
-    role: 'mobilizer',
-    status: 'approved',
-    home_ward_name: 'Sheywe',
-    referral_code: 'LUR789'
-  },
-  {
-    id: 'usr-04',
-    email: 'kelvin.onboarding@gmail.com',
-    full_name: 'Kelvin Omwoma Synthetic',
-    phone_e164: '+254733445566',
-    national_id_masked: '32***901',
-    role: 'mobilizer',
-    status: 'pending',
-    home_ward_id: 'a0000001-0000-0000-0000-000000000003',
-    home_ward_name: 'Mahiakalo'
-  },
-  {
-    id: 'usr-05',
-    email: 'fridah.applicant@gmail.com',
-    full_name: 'Fridah Khalayi Synthetic',
-    phone_e164: '+254711889900',
-    national_id_masked: '29***882',
-    role: 'mobilizer',
-    status: 'pending',
-    home_ward_id: 'a0000001-0000-0000-0000-000000000004',
-    home_ward_name: 'Butsotso East'
-  }
-];
-
 interface UserManagementViewProps {
   onAuditAction: (action: string, entityId: string, reason: string) => void;
 }
 
 export const UserManagementView: React.FC<UserManagementViewProps> = ({ onAuditAction }) => {
-  const [profiles, setProfiles] = useState<Profile[]>(SAMPLE_PROFILES);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 

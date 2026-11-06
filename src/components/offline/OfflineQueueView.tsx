@@ -113,7 +113,7 @@ export const OfflineQueueView: React.FC<OfflineQueueViewProps> = ({
             ) : (
               <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
                 <Wifi className="w-4 h-4 text-emerald-700" />
-                Online (Connected to Supabase)
+                Online
               </span>
             )}
             <span className="text-xs text-gray-500 font-mono">

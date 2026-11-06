@@ -21,11 +21,9 @@ import {
   DryRunReport, 
   ProcessedImportRow 
 } from '../../lib/normalisation/importerCore.ts';
-import { runAllNormalisationUnitTests, TestResultItem } from '../../lib/normalisation/normalisation.test.ts';
 
 export const ImportWizard: React.FC = () => {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [activeTab, setActiveTab] = useState<'wizard' | 'test_runner'>('wizard');
 
   // Importer state
   const [workbookData, setWorkbookData] = useState<Record<string, LegacyWorkbookRow[]> | null>(null);
@@ -38,15 +36,6 @@ export const ImportWizard: React.FC = () => {
   const [isCommitting, setIsCommitting] = useState(false);
   const [commitProgress, setCommitProgress] = useState(0);
   const [commitComplete, setCommitComplete] = useState(false);
-
-  // Unit tests state
-  const [testReport, setTestReport] = useState<{
-    allPassed: boolean;
-    total: number;
-    passed: number;
-    failed: number;
-    results: TestResultItem[];
-  } | null>(() => runAllNormalisationUnitTests());
 
   // Handle user uploaded file via SheetJS
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,49 +161,9 @@ export const ImportWizard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Navigation & Mode Switcher */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
-          </div>
-          <div>
-            <h3 className="font-bold text-sm text-gray-900">
-              Stage 3: Legacy Excel Importer Wizard & Normalisation Engine
-            </h3>
-            <p className="text-xs text-gray-500">
-              Handles lost leading zeros, 14% ID completion, place typos, and misused support columns.
-            </p>
-          </div>
-        </div>
+      <h2 className="font-semibold text-gray-900">Import and clean workbook</h2>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('wizard')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'wizard'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Play className="w-3.5 h-3.5" />
-            4-Step Import Wizard
-          </button>
-          <button
-            onClick={() => setActiveTab('test_runner')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'test_runner'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            Unit Tests ({testReport?.passed}/{testReport?.total} Passed)
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'wizard' ? (
+      <>
         <div className="space-y-6">
           {/* Stepper Header */}
           <div className="grid grid-cols-4 gap-2 text-xs font-bold text-center">
@@ -656,68 +605,7 @@ export const ImportWizard: React.FC = () => {
             </div>
           )}
         </div>
-      ) : (
-        /* Test Runner Tab */
-        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <div>
-              <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Normalisation Unit Test Suite Execution
-              </h4>
-              <p className="text-xs text-gray-500">
-                Automated assertions validating Kenyan phone normalisation, 7-8 digit national IDs, trigram ward matching, junk places, and support column names.
-              </p>
-            </div>
-            <button
-              onClick={() => setTestReport(runAllNormalisationUnitTests())}
-              className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-semibold flex items-center gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-gray-600" />
-              Re-run Tests
-            </button>
-          </div>
-
-          {/* Test results table */}
-          {testReport && (
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-              <table className="min-w-full text-xs divide-y divide-gray-200">
-                <thead className="bg-gray-100 text-gray-700 font-bold">
-                  <tr>
-                    <th className="py-2 px-3 text-left">Category</th>
-                    <th className="py-2 px-3 text-left">Test Specification</th>
-                    <th className="py-2 px-3 text-left">Expected</th>
-                    <th className="py-2 px-3 text-left">Actual</th>
-                    <th className="py-2 px-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 text-gray-700">
-                  {testReport.results.map((res, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="py-2.5 px-3 font-semibold text-gray-900">{res.category}</td>
-                      <td className="py-2.5 px-3">{res.name}</td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-gray-600">{res.expected}</td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-emerald-700">{res.actual}</td>
-                      <td className="py-2.5 px-3 text-center">
-                        {res.passed ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            PASS
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">
-                            FAIL
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+      </>
     </div>
   );
 };

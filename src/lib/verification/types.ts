@@ -15,7 +15,7 @@ export interface VerificationResult {
   entryId: string;
   status: VerificationStatus;
   confidence: number;
-  providerName: 'register_import' | 'manual' | 'external_link';
+  providerName: 'register_import' | 'manual';
   evidenceNote: string;
   verifiedAt: string;
   matchedVoterRecord?: {
@@ -24,11 +24,10 @@ export interface VerificationResult {
     wardName: string;
     pollingCentreName: string;
   };
-  rateLimitRemaining?: number;
 }
 
 export interface VerificationProvider {
-  id: 'register_import' | 'manual' | 'external_link';
+  id: 'register_import' | 'manual';
   name: string;
   description: string;
   isEnabled: boolean;
@@ -37,10 +36,7 @@ export interface VerificationProvider {
 }
 
 export interface VerificationProviderConfig {
-  activeProvider: 'register_import' | 'manual' | 'external_link';
+  activeProvider: 'register_import' | 'manual';
   registerImportEnabled: boolean;
   manualEnabled: boolean;
-  externalLinkEnabled: boolean;
-  externalLinkBaseUrl: string;
-  externalLinkRateLimitPerMin: number;
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserRole, Entry } from './types/index.ts';
+import { Entry } from './types/index.ts';
 import { Header } from './components/Header.tsx';
 import { ImportWizard } from './components/importer/ImportWizard.tsx';
 import { VerificationLogicView } from './components/verification/VerificationLogicView.tsx';
@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [currentRole, setCurrentRole] = useState<UserRole>('admin');
   const [activeTab, setActiveTab] = useState<'importer_wizard' | 'verification_logic' | 'mobilizer_capture' | 'admin_panel' | 'analytics_dashboard'>('analytics_dashboard');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [isSimulatedOffline, setIsSimulatedOffline] = useState(false);
@@ -23,15 +22,6 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Platform Navigation Header */}
       <Header
-        currentRole={currentRole}
-        onRoleChange={role => {
-          setCurrentRole(role);
-          if (role === 'admin') {
-            setActiveTab('analytics_dashboard');
-          } else if (role === 'mobilizer') {
-            setActiveTab('mobilizer_capture');
-          }
-        }}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />

@@ -15,13 +15,13 @@ import {
   AlertTriangle,
   FileCheck
 } from 'lucide-react';
-import { INITIAL_PASTORS, INITIAL_CHPS, CANONICAL_WARDS } from '../../data/canonicalData.ts';
+import { CANONICAL_WARDS } from '../../data/canonicalData.ts';
 import { NetworkContact, ReachStatus } from '../../types/index.ts';
 
 export const NetworkContactsManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pastors' | 'chps'>('pastors');
-  const [pastors, setPastors] = useState<NetworkContact[]>(INITIAL_PASTORS);
-  const [chps, setChps] = useState<NetworkContact[]>(INITIAL_CHPS);
+  const [pastors, setPastors] = useState<NetworkContact[]>([]);
+  const [chps, setChps] = useState<NetworkContact[]>([]);
   const [chpExportProtection, setChpExportProtection] = useState<boolean>(true);
   const [editingContact, setEditingContact] = useState<NetworkContact | null>(null);
 
