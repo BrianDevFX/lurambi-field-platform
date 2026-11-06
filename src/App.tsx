@@ -8,6 +8,7 @@ import { AdminOperationsView } from './components/admin/AdminOperationsView.tsx'
 import { ExportCenter } from './components/admin/ExportCenter.tsx';
 import { CoordinatorEntriesView } from './components/admin/CoordinatorEntriesView.tsx';
 import { PlacesAdminView } from './components/admin/PlacesAdminView.tsx';
+import { DataSubjectRequestPage, JoinPage, PrivacyNoticePage } from './components/public/PublicPages.tsx';
 import { MobilizerDashboard } from './components/mobilizer/MobilizerDashboard.tsx';
 import { supabase } from './lib/supabase/client.ts';
 import { Profile } from './types/index.ts';
@@ -76,7 +77,7 @@ function AdminWorkspace({ currentProfile }: { currentProfile: Profile }) {
   </div>;
 }
 
-function App() {
+function AuthenticatedApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,6 +205,15 @@ function App() {
         : profile.role === 'admin' ? <AdminWorkspace currentProfile={profile} /> : <UserManagementView currentProfile={profile} />}
     </div>
   </main>;
+}
+
+function App() {
+  const path=window.location.pathname;
+  const joinMatch=path.match(/^\/join\/([^/]+)\/?$/);
+  if(joinMatch)return <JoinPage referralCode={decodeURIComponent(joinMatch[1])}/>;
+  if(path==='/privacy'||path==='/privacy-notice')return <PrivacyNoticePage/>;
+  if(path==='/data-subject-request')return <DataSubjectRequestPage/>;
+  return <AuthenticatedApp/>;
 }
 
 export default App;

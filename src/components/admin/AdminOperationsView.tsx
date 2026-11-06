@@ -1,9 +1,10 @@
 import { ChangeEvent, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase/client.ts';
+import { DataSubjectRequestsView, LegacyConsentView } from './PrivacyOperationsView.tsx';
 
 type EntryRow = { id: string; mobilizer_id?: string | null; name: string; phone_e164: string | null; id_masked: string | null; ward_filed_id: string; polling_centre_id: string | null; polling_station_id: string | null; support_level: string; verification_status: string; verification_notes: string | null; captured_on: string; flags: string[]; notes: string | null };
 type Place = { id: string; name: string };
-type Tab = 'entries' | 'flags' | 'verification' | 'audit' | 'settings';
+type Tab = 'entries' | 'flags' | 'verification' | 'audit' | 'settings' | 'dsr' | 'legacy_consent';
 const buttonClass = 'rounded border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700';
 const safeCell = (value: unknown) => { const text = value && typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''); return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text; };
 
@@ -115,6 +116,6 @@ function SettingsView() {
 
 export function AdminOperationsView() {
   const [tab,setTab]=useState<Tab>('entries');
-  const tabs:Tab[]=['entries','flags','verification','audit','settings'];
-  return <div className="space-y-5"><nav aria-label="Admin operations" className="flex gap-2 overflow-x-auto border-b">{tabs.map((item)=><button key={item} onClick={()=>setTab(item)} className={`border-b-2 px-3 py-2 text-sm font-semibold capitalize ${tab===item?'border-emerald-700 text-emerald-800':'border-transparent text-slate-600'}`}>{item==='audit'?'Audit log':item}</button>)}</nav>{tab==='entries'?<EntryReviewView/>:tab==='flags'?<FlagsView/>:tab==='verification'?<VerificationView/>:tab==='audit'?<AuditLogView/>:<SettingsView/>}</div>;
+  const tabs:Tab[]=['entries','flags','verification','legacy_consent','dsr','audit','settings'];
+  return <div className="space-y-5"><nav aria-label="Admin operations" className="flex gap-2 overflow-x-auto border-b">{tabs.map((item)=><button key={item} onClick={()=>setTab(item)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold capitalize ${tab===item?'border-emerald-700 text-emerald-800':'border-transparent text-slate-600'}`}>{item==='audit'?'Audit log':item==='dsr'?'Data requests':item==='legacy_consent'?'Legacy consent':item.replaceAll('_',' ')}</button>)}</nav>{tab==='entries'?<EntryReviewView/>:tab==='flags'?<FlagsView/>:tab==='verification'?<VerificationView/>:tab==='legacy_consent'?<LegacyConsentView/>:tab==='dsr'?<DataSubjectRequestsView/>:tab==='audit'?<AuditLogView/>:<SettingsView/>}</div>;
 }
