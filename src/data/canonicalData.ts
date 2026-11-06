@@ -45,4 +45,3 @@ export const CANONICAL_ALIASES: PlaceAlias[] = [
   { id: '8', raw_alias: 'Chief Mutsembi', canonical_type: 'polling_centre', confidence: 0.0, notes: 'Administrative landmark -> Needs Mapping' },
   { id: '9', raw_alias: 'Approved', canonical_type: 'polling_centre', confidence: 0.0, notes: 'Status string in place column -> Needs Mapping' }
 ];
-
